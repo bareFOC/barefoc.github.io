@@ -14,29 +14,46 @@ BareFOC uses discrete cascaded control loops to achieve precise velocity and ang
 
 ## Cascaded Loop Architecture
 
+```mermaid
+flowchart LR
+    subgraph PosLoop ["Position Tracking Loop (Outer)"]
+        TargetAngle(["Target Angle (rad)"]) --> AngleSum((+ -))
+        AngleSum --> AnglePID["Angle P/PID<br/>motor.P_angle"]
+        AnglePID --> TargetVel(["Target Velocity (rad/s)"])
+    end
+
+    subgraph VelLoop ["Velocity Regulation Loop (Middle)"]
+        TargetVel --> VelSum((+ -))
+        VelSum --> VelPID["Velocity PID<br/>motor.PID_velocity"]
+        VelPID --> TargetVq(["Target Voltage Vq (V)"])
+    end
+
+    subgraph Commutation ["FOC Commutation (Inner)"]
+        TargetVq --> InvPark["Inverse Park<br/>& Space Vector PWM"]
+        InvPark --> Inverter["BLDCDriver<br/>PWM Output"]
+    end
+
+    subgraph Feedback ["Sensor Feedback Pipeline"]
+        RawSensor[("Angle Sensor<br/>Sensor::update()")] --> Unwrapped["Unwrapped Angle (θm)"]
+        Unwrapped --> AngleSum
+        Unwrapped --> Diff["Derivative (Δθ / Δt)"]
+        Diff --> LPF["Low-Pass Filter<br/>motor.LPF_velocity"]
+        LPF --> VelSum
+    end
 ```
-Angle Reference (rad)
-       │
-       ▼  (+)
-    ┌─────┐    Angle Error    ┌────────────────┐   Target Velocity
-    │ Sum │─────────────────►│   Angle PID    │─────────────────┐
-    └─────┘ (-)               └────────────────┘                 │
-       ▲                                                         │
-       │ Mechanical Angle (θm)                                   │
-       └──────────────────────────┐                              │
-                                  │                              │
-                                  ▼  (+)                         ▼
-                               ┌─────┐    Velocity Error   ┌────────────────┐   Target Voltage (Vq)
-                               │ Sum │───────────────────►│  Velocity PID  │─────────────────┐
-                               └─────┘ (-)                 └────────────────┘                 │
-                                  ▲                                                           ▼
-                                  │ Filtered Speed                                      Inverse Park
-                               ┌──────────────────┐                                       & SVPWM
-                               │  Low-Pass Filter │                                           │
-                               └──────────────────┘                                           ▼
-                                  ▲                                                     BLDCDriver PWM
-                                  │ Raw Sensor Velocity
-```
+
+---
+
+## PID Controller Parameter Matrix
+
+| Parameter | Field Name | Typical Range | Function & Tuning Impact |
+|---|---|---|---|
+| **Proportional Gain** | `P` | `0.01` – `2.0` | Primary stiffness. Increase to reduce tracking error; excessive values cause high-frequency oscillation. |
+| **Integral Gain** | `I` | `0.1` – `50.0` | Eliminates steady-state droop under constant load. Too high causes low-frequency overshoot and ringing. |
+| **Derivative Gain** | `D` | `0.000` – `0.01` | Adds transient damping against velocity shocks. Sensitive to sensor noise; always pair with low-pass filtering. |
+| **Output Saturation** | `limit` | $0$ – $V_{supply}$ | Clamps maximum output voltage or current, protecting driver stages and preventing motor overheating. |
+| **Acceleration Ramp** | `output_ramp` | `100.0` – `5000.0` | Maximum rate of change ($dU / dt$). Prevents sudden mechanical shock and inrush current spikes. |
+| **Derivative Filter** | `Tf` | `0.001` – `0.020` | Time constant of the derivative filter. Suppresses quantization noise from discrete encoder edges. |
 
 ---
 

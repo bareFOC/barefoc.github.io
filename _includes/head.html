@@ -1,0 +1,133 @@
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:ital,wght@200;300;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <title>{% if page.title and page.url != "/" %}{{ page.title }} | {% endif %}{{ site.title }}</title>
+  {% if page.description %}
+    <meta name="Description" content="{{ page.description }}">
+  {% elsif site.description %}
+    <meta name="Description" content="{{ site.description }}">
+  {% endif %}
+
+  <link rel="shortcut icon" href="{{ site.favicon_ico | absolute_url }}" type="image/x-icon">
+  <link rel="stylesheet" href="{{ '/assets/css/just-the-docs.css' | absolute_url }}">
+  <script type="text/javascript" src="{{ '/assets/js/vendor/lunr.min.js' | absolute_url }}"></script>
+  <script type="text/javascript" src="{{ '/assets/js/just-the-docs.js' | absolute_url }}"></script>
+
+  <!-- MathJax v3 Configuration for TeX / LaTeX Math Rendering -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- Mermaid.js for Architecture & State Diagrams -->
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose'
+    });
+    document.addEventListener("DOMContentLoaded", function () {
+      const mermaidBlocks = document.querySelectorAll('pre.highlight code.language-mermaid, div.language-mermaid pre, pre code.language-mermaid');
+      mermaidBlocks.forEach(function (block) {
+        const pre = block.closest('pre');
+        const code = block.textContent;
+        const container = document.createElement('div');
+        container.className = 'mermaid';
+        container.textContent = code;
+        if (pre && pre.parentNode) {
+          const wrapper = pre.closest('.highlighter-rouge') || pre;
+          wrapper.parentNode.replaceChild(container, wrapper);
+        }
+      });
+      mermaid.run({
+        querySelector: '.mermaid'
+      });
+    });
+  </script>
+
+  <style>
+    /* Diagram & Math Layout Enhancements */
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 1.5rem 0;
+      background: #fafafa;
+      padding: 1rem;
+      border-radius: 6px;
+      border: 1px solid #e1e4e8;
+      overflow-x: auto;
+    }
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+    .mjx-chtml {
+      outline: none;
+    }
+    /* Table styling enhancements */
+    .page-content table {
+      width: 100%;
+      display: table;
+      margin-bottom: 1.5rem;
+      border-collapse: collapse;
+    }
+    .page-content table th, .page-content table td {
+      padding: 0.65rem 0.85rem;
+      border: 1px solid #dfe2e5;
+    }
+    .page-content table th {
+      background-color: #f6f8fa;
+      font-weight: 600;
+    }
+    .page-content table tr:nth-child(2n) {
+      background-color: #fcfcfc;
+    }
+    .code-wrapper {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .copy-code-button {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      cursor: pointer;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #333;
+      transition: all 0.2s;
+      z-index: 10;
+    }
+    .copy-code-button:hover {
+      background-color: #e0e0e0;
+      border-color: #999;
+      color: #000;
+    }
+    .copy-code-button.copied {
+      background-color: rgba(76, 175, 80, 0.8);
+      color: white;
+      border-color: rgba(76, 175, 80, 1);
+    }
+  </style>
+
+  {% seo %}
+</head>

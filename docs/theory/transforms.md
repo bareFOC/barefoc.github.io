@@ -16,19 +16,57 @@ BareFOC implements the mathematical transformations required to convert between 
 
 The Clarke transform projects balanced three-phase quantities ($a, b, c$) onto a stationary orthogonal 2D frame ($\alpha, \beta$):
 
+```mermaid
+flowchart LR
+    subgraph ThreePhase ["3-Phase Physical Coils"]
+        Pa["Phase a (0°)"]
+        Pb["Phase b (120°)"]
+        Pc["Phase c (240°)"]
+    end
+
+    subgraph Stationary ["Stationary Orthogonal Frame"]
+        Alpha["α-axis (collinear with Phase a)"]
+        Beta["β-axis (orthogonal at +90°)"]
+    end
+
+    ThreePhase -->|"Clarke Transform"| Stationary
 ```
-       Phase b
-          ▲
-          │      β-axis
-          │        ▲
-          │        │
-          │        │
-          └────────┼───────► α-axis, Phase a
-                  /
-                 /
-                ▼
-             Phase c
+
+---
+
+## Transform Execution Pipeline
+
+In a complete FOC loop iteration, data passes through forward transforms for sensing and inverse transforms for actuation:
+
+```mermaid
+flowchart TD
+    subgraph SensingPipeline ["Current Sensing Pipeline (Feedback)"]
+        SensA["Phase Current Ia"] --> FwdClarke["Forward Clarke<br/>clarke(ia, ib)"]
+        SensB["Phase Current Ib"] --> FwdClarke
+        FwdClarke --> AlphaBeta["Stationary Currents<br/>(iα, iβ)"]
+        AlphaBeta --> FwdPark["Forward Park<br/>park(iα, iβ, θe)"]
+        EncAngle["Electrical Angle (θe)"] --> FwdPark
+        FwdPark --> DQFeedback["Rotating Currents<br/>(id, iq)"]
+    end
+
+    subgraph ActuationPipeline ["Voltage Actuation Pipeline (Command)"]
+        VqdCmd["Voltage Commands<br/>(Vd, Vq)"] --> InvPark["Inverse Park<br/>inv_park(vd, vq, θe)"]
+        EncAngle --> InvPark
+        InvPark --> VAlphaBeta["Stationary Voltages<br/>(Vα, Vβ)"]
+        VAlphaBeta --> Modulator["Modulator<br/>(SVPWM / SinePWM)"]
+        Modulator --> DutyCycles["PWM Inverter Duties<br/>(Ta, Tb, Tc)"]
+    end
 ```
+
+---
+
+## Coordinate Frame Properties
+
+| Reference Frame | Coordinates | Alignment & Rotation | Physical Meaning |
+|---|---|---|---|
+| **Phase Coordinates** | $a, b, c$ | Stationary, spaced $120^\circ$ apart | Individual stator winding terminal currents and voltages |
+| **Clarke Frame** | $\alpha, \beta$ | Stationary orthogonal, $\alpha$ along phase $a$ | Equivalent two-phase stationary stator vector |
+| **Park Frame** | $d, q$ | Rotating synchronously with rotor at speed $\omega_e$ | DC quantities: $d$ controls flux, $q$ produces torque |
 
 Assuming a balanced 3-phase system with isolated neutral ($i_a + i_b + i_c = 0$), the transformation equations implemented in `barefoc::math::clarke` are:
 

@@ -39,13 +39,39 @@ BareFOC is engineered around five fundamental constraints:
 
 The BareFOC project is organized as a modular workspace of focused crates:
 
-```
-bareFOC Workspace
-├── bareFOC             # Core FOC algorithms, transforms, math, traits, and motor state machines
-├── barefoc-drivers     # Encoders (AS5600, AS5048, MT6701), gate drivers (DRV8316, DRV8311), DC motors
-├── barefoc-comms       # Commander ASCII protocol, Fibre RPC (ODrive Web GUI), Multibus, SEGGER RTT
-├── barefoc-hal         # Microcontroller hardware bridges (STM32, ESP32, CH32 RISC-V)
-└── barefoc-sim         # SIL electromechanical physics simulation engine and GUI tuning bridge
+```mermaid
+graph TD
+    subgraph App ["Application & High-Level Control"]
+        COM["barefoc-comms<br/>Commander • Fibre RPC • Multibus • RTT"]
+        KIN["bareFOC::kinematics<br/>Transmissions • Joint Kinematics • Homing"]
+    end
+
+    subgraph Core ["bareFOC (Core Engine — #![no_std])"]
+        MOTOR["bareFOC::motor<br/>BLDCMotor • StepperMotor • Hybrid • DCMotor"]
+        MATH["bareFOC::math<br/>Clarke • Park • SVPWM • SinePWM"]
+        COMMON["bareFOC::common<br/>PIDController • LowPassFilter • Clock"]
+        TRAITS["bareFOC::traits<br/>FOCMotor • BLDCDriver • Sensor • CurrentSense"]
+    end
+
+    subgraph Drivers ["barefoc-drivers"]
+        SENS["Sensors<br/>MT6701 • AS5048 • AS5600 • TMAG5273 • Hall"]
+        GATE["Gate Drivers<br/>DRV8316 • DRV8311 • L6234 • 6PWM • 3PWM"]
+    end
+
+    subgraph Target ["Hardware Targets & SIL Simulation"]
+        HAL["barefoc-hal<br/>STM32 • ESP32 • CH32 RISC-V"]
+        SIM["barefoc-sim<br/>Coupled ODE Physics • Sub-stepped SIL"]
+    end
+
+    COM --> MOTOR
+    KIN --> MOTOR
+    MOTOR --> MATH
+    MOTOR --> COMMON
+    MOTOR --> TRAITS
+    TRAITS -.-> SENS
+    TRAITS -.-> GATE
+    TRAITS -.-> HAL
+    TRAITS -.-> SIM
 ```
 
 ### Module Breakdown
@@ -67,32 +93,30 @@ bareFOC Workspace
 
 A standard closed-loop FOC control iteration follows a deterministic sequence:
 
+```mermaid
+flowchart LR
+    Target(["Target<br/>(Angle / Velocity / Torque)"]) --> PID["PID Loop<br/>(Position / Speed PID)"]
+    Sensor[("Position Sensor<br/>Sensor::update()")] -->|"Angle & Velocity"| PID
+    Sensor -->|"Electrical Angle θe"| InvPark["Inverse Park Transform"]
+    PID -->|"Vq, Vd commands"| InvPark
+    InvPark -->|"Vα, Vβ"| SVPWM["Space Vector PWM<br/>(SVPWM Modulator)"]
+    SVPWM -->|"Duty Cycles: Ta, Tb, Tc"| Driver["BLDCDriver<br/>(embedded-hal PWM)"]
+    Driver --> Inverter["3-Phase Inverter & Motor"]
 ```
-               Target (Angle / Velocity / Torque)
-                             │
-                             ▼
-                   ┌───────────────────┐
-                   │  Position / Speed │ ◄── Sensor::update()
-                   │   PID Controller  │
-                   └─────────┬─────────┘
-                             │ Vq, Vd
-                             ▼
-                   ┌───────────────────┐
-                   │   Inverse Park    │ ◄── Electrical Angle (θe)
-                   │    Transform      │
-                   └─────────┬─────────┘
-                             │ Vα, Vβ
-                             ▼
-                   ┌───────────────────┐
-                   │   Space Vector    │
-                   │  PWM Modulation   │
-                   └─────────┬─────────┘
-                             │ Duty Cycles (Ta, Tb, Tc)
-                             ▼
-                   ┌───────────────────┐
-                   │  BLDCDriver PWM   │ ──► Phase Inverter
-                   └───────────────────┘
-```
+
+---
+
+## Architectural Comparison: SimpleFOC vs BareFOC
+
+| Attribute | Upstream SimpleFOC (C++) | BareFOC (Embedded Rust) |
+|---|---|---|
+| **Language & Safety** | C++11 (raw pointers, unchecked buffer indexing) | Rust 2021 (strict memory safety, zero undefined behavior) |
+| **Allocation & Heap** | Dynamic heap allocation permitted (`new`, `String`) | Strict `#![no_std]` zero-allocation (`no heap`) |
+| **HAL Portability** | Arduino Core peripheral abstraction | Standardized `embedded-hal` 1.0 & `embedded-io` traits |
+| **Concurrency Support** | Monolithic `loop()` busy-waiting | Compatible with cooperative interrupts, RTIC, and async Embassy |
+| **Mathematical Precision** | Single precision `float`, Arduino `sin()`/`cos()` | High-performance `libm` implementations, hardware CORDIC support |
+| **Testing & CI** | Physical hardware required for integration tests | Host-based Software-in-the-Loop (`barefoc-sim`) ODE physics engine |
+| **Protocol Support** | Basic blocking Commander serial parser | Commander, ODrive Fibre Web GUI (WebSocket), Multibus, RTT |
 
 ---
 

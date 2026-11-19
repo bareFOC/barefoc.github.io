@@ -29,6 +29,31 @@ hall.update();
 let angle = hall.get_mechanical_angle();
 ```
 
+### 60° Commutation Sector State Machine:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Sector1
+    Sector1 --> Sector2 : Forward (60°)
+    Sector2 --> Sector3 : Forward (120°)
+    Sector3 --> Sector4 : Forward (180°)
+    Sector4 --> Sector5 : Forward (240°)
+    Sector5 --> Sector6 : Forward (300°)
+    Sector6 --> Sector1 : Forward (0° / 360°)
+```
+
+### Digital Hall Sensor Truth Table:
+
+| Sector | Hall A | Hall B | Hall C | Binary Code | Nominal Electrical Angle ($\theta_e$) |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | `1` | `0` | `1` | `0b101` (5) | $0^\circ$ ($0.0\text{ rad}$) |
+| **2** | `1` | `0` | `0` | `0b100` (4) | $60^\circ$ ($\frac{\pi}{3}\text{ rad}$) |
+| **3** | `1` | `1` | `0` | `0b110` (6) | $120^\circ$ ($\frac{2\pi}{3}\text{ rad}$) |
+| **4** | `0` | `1` | `0` | `0b010` (2) | $180^\circ$ ($\pi\text{ rad}$) |
+| **5** | `0` | `1` | `1` | `0b011` (3) | $240^\circ$ ($\frac{4\pi}{3}\text{ rad}$) |
+| **6** | `0` | `0` | `1` | `0b001` (1) | $300^\circ$ ($\frac{5\pi}{3}\text{ rad}$) |
+
 ### Interpolation Algorithm:
 Because three digital Hall sensors provide only 6 discrete state transitions per electrical revolution (60° electrical resolution), BareFOC continuously measures the elapsed time $\Delta t_{\text{sector}}$ between Hall transitions and interpolates the intermediate electrical angle:
 

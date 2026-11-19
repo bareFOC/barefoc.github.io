@@ -71,6 +71,29 @@ When running in torque mode (or inside the inner loop of velocity/angle control)
 3. **`FOC_Current`**:
    True vector current control using dual/triple phase current sensors. Closed-loop PID controllers regulate both $I_d = 0$ and $I_q = I_{\text{target}}$ at high frequency.
 
+```mermaid
+stateDiagram-v2
+    [*] --> Uninitialized
+    Uninitialized --> Initialized : motor.init(driver, sensor)
+    Initialized --> AligningSensor : motor.init_foc(driver, sensor, clock)
+    AligningSensor --> ZeroOffsetFound : Apply voltage along Phase A (θe = 0)
+    ZeroOffsetFound --> DirectionVerified : Verify sensor direction & pole pairs
+    DirectionVerified --> Ready : Alignment complete, motor armed
+    Ready --> RunningFOC : High-frequency loop_foc() execution
+    RunningFOC --> Standby : Target reached / Idle
+    Standby --> RunningFOC : New motion command
+```
+
+---
+
+## Torque Control Types Comparison
+
+| Torque Mode | Sensor Feedback | Loop Dynamics | Efficiency | Use Case |
+|---|---|---|---|---|
+| **`Voltage`** | Position Sensor only | Open-loop voltage synthesis ($V_q = I_{\text{target}} \cdot R + \omega \cdot K_e$) | Low to Moderate (losses during rotor transients) | Gimbal motors, educational setups, simple position servos |
+| **`DC_Current`** | Single DC bus shunt + Position | Scalar current PI regulation | Good | Low-cost ESCs, power tools |
+| **`FOC_Current`** | 2 or 3 Phase Shunts + Position | Dual independent $d$-$q$ vector current PIDs | Maximum (Exact MTPA $I_d = 0$, minimum copper loss) | High-performance robotics, CNC spindles, direct-drive actuators |
+
 ---
 
 ## Real-Time Execution

@@ -18,11 +18,31 @@ BareFOC provides two primary driver implementations for 3-phase BLDC motors:
 
 The 3-PWM driver uses three independent PWM channels, typically driving integrated half-bridge power stages (such as the L6234, MP6540, or DRV8313) where internal logic automatically generates complementary high-side and low-side switching with built-in dead-time.
 
-```
-MCU Pin 1 (PWM A) ───► Inverter Phase A (High/Low)
-MCU Pin 2 (PWM B) ───► Inverter Phase B (High/Low)
-MCU Pin 3 (PWM C) ───► Inverter Phase C (High/Low)
-MCU Pin 4 (Enable)───► Inverter Enable (Optional)
+```mermaid
+flowchart LR
+    subgraph MCU ["Microcontroller Outputs"]
+        PWMA["PWM Phase A"]
+        PWMB["PWM Phase B"]
+        PWMC["PWM Phase C"]
+        EN["Driver Enable"]
+    end
+
+    subgraph Bridge ["Integrated 3-Phase Driver (e.g. L6234 / DRV8313)"]
+        HBA["Half-Bridge A<br/>(Auto Dead-Time)"]
+        HBB["Half-Bridge B<br/>(Auto Dead-Time)"]
+        HBC["Half-Bridge C<br/>(Auto Dead-Time)"]
+    end
+
+    subgraph Motor ["Motor Coils"]
+        UA["Coil U"]
+        UB["Coil V"]
+        UC["Coil W"]
+    end
+
+    PWMA --> HBA --> UA
+    PWMB --> HBB --> UB
+    PWMC --> HBC --> UC
+    EN -.-> Bridge
 ```
 
 ### Rust Usage:
@@ -42,11 +62,31 @@ driver.init();
 
 For high-power inverters built from discrete MOSFETs or dedicated half-bridge drivers (e.g. DRV8301, FD6288), the microcontroller must independently control both the high-side FET and low-side FET of each phase.
 
+```mermaid
+flowchart TD
+    subgraph Timer ["Microcontroller Advanced Timer (TIM1 / MCPWM)"]
+        PWM_IN["Center-Aligned PWM Counter (Dual Slope)"]
+        DTG["Dead-Time Generator (50 - 500 ns)"]
+        PWM_IN --> DTG
+    end
+
+    subgraph PhaseA ["Phase A Half-Bridge"]
+        DTG -->|"INH_A (Active High)"| HSFET["High-Side MOSFET"]
+        DTG -->|"INL_A (Active Low/High)"| LSFET["Low-Side MOSFET"]
+        HSFET --> PhaseOut["Phase A Node (U)"]
+        LSFET --> PhaseOut
+    end
 ```
-Phase A: High-Side PWM (INHA) + Low-Side PWM (INLA)
-Phase B: High-Side PWM (INHB) + Low-Side PWM (INLB)
-Phase C: High-Side PWM (INHC) + Low-Side PWM (INLC)
-```
+
+---
+
+## Inverter Topology Comparison
+
+| Topology | Driver Type | MCU Pins Required | Dead-Time Handling | Max Current / Power | Typical Gate Driver ICs |
+|---|---|---|---|---|---|
+| **3-PWM** | `BLDCDriver3PWM` | 3 PWM + 1 Enable | Automatic internal | Low to Medium ($\le 5\text{ A}$) | L6234, MP6540, DRV8313, TMC6300 |
+| **6-PWM** | `BLDCDriver6PWM` | 6 PWM (3 complementary pairs) | MCU Hardware Dead-Time Generator | High to Very High ($10\text{ A} - 200+\text{ A}$) | DRV8301, DRV8305, FD6288, Discrete FETs |
+| **Brushed DC** | `DCDriver2PWM` / `1PWM` | 1 or 2 PWM + Direction | Built-in or H-Bridge shoot-through logic | Low to High | DRV8871, L9110S, A4950, BTS7960 |
 
 ### Critical Requirements:
 - **Hardware Dead-Time Insertion**: When transitioning a phase from high-side to low-side, both transistors must be briefly off ($\approx 50\text{--}500\text{ ns}$) to prevent catastrophic shoot-through current directly from the DC rail to ground.

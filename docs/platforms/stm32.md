@@ -10,9 +10,43 @@ permalink: /platforms/stm32/
 
 `barefoc-stm32` bridges the `embassy-stm32` HAL to BareFOC traits across STM32F4, STM32G4, and STM32H5 microcontrollers.
 
+```mermaid
+flowchart TD
+    subgraph Core ["ARM Cortex-M Core"]
+        CPU["Cortex-M33 / M4<br/>FPU + DSP Instructions"]
+        DWT["DWT Cycle Counter<br/>(Sub-µs DwtClock)"]
+        CORDIC["STM32G4 CORDIC Coprocessor<br/>(4-cycle Sin / Cos)"]
+    end
+
+    subgraph Timers ["Advanced & General Purpose Timers"]
+        TIM1["Advanced Timer (TIM1 / TIM8)<br/>Complementary 6-PWM + Dead-Time"]
+        TIM2["Encoder Timer (TIM2 / TIM3 / TIM4)<br/>Hardware QEI Encoder Counter"]
+    end
+
+    subgraph Analog ["Analog Front-End"]
+        OPAMP["Internal OPAMPs (PGA 1x - 64x)"]
+        ADC["Fast 12-bit ADC (Dual/Triple)<br/>Triggered on PWM Center"]
+    end
+
+    CPU --> TIM1
+    TIM2 --> CPU
+    DWT --> CPU
+    CORDIC <--> CPU
+    OPAMP --> ADC
+    TIM1 -.->|"TRGO Trigger"| ADC
+```
+
 ---
 
-## 1. Complementary 6-PWM (`Stm32BldcDriver6Pwm`)
+## STM32 Motor Control Timer Allocation
+
+| Peripheral | Typical Hardware Use | Channels / Features |
+|---|---|---|
+| **`TIM1` / `TIM8`** | 3-Phase Complementary Inverter | `CH1/CH1N`, `CH2/CH2N`, `CH3/CH3N` center-aligned + Dead-Time + Break Input (`BKIN`) |
+| **`TIM2` / `TIM5`** | 32-bit Quadrature Encoder | `CH1/CH2` in SMS Encoder Mode 3, 32-bit overflow accumulator |
+| **`TIM3` / `TIM4`** | 16-bit Quadrature Encoder | `CH1/CH2` in SMS Encoder Mode 3, 16-bit counter |
+| **`ADC1` / `ADC2`** | Synchronized Phase Current Sampling | Injected group triggered on `TIM1_TRGO` at PWM counter peak |
+| **`DWT_CYCCNT`** | High-Precision Monotonic Clock | Single-cycle resolution timestamps up to 170 MHz / 250 MHz |
 
 Leverages Advanced Control Timers (`TIM1`, `TIM8`):
 - Generates 3 complementary PWM pairs (`CH1/CH1N`, `CH2/CH2N`, `CH3/CH3N`).
