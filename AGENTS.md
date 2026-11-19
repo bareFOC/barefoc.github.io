@@ -38,6 +38,11 @@ The portal uses **MathJax v3** configured for both inline and display math.
 - **Structured Tables**:
   - Use tables for feature comparisons (e.g., BareFOC vs Arduino SimpleFOC, 3PWM vs 6PWM), sensor interface specifications, pinout mappings, register maps, and PID tuning matrices.
 
+### D. Professional Tone & Objectivity (No Hype)
+- **Objective, Factual Language**: Always use objective, factual language without promotional framing or hype.
+- **Zero Marketing Hype**: Avoid subjective or hyperbolic phrasing (e.g. *"groundbreaking"*, *"revolutionary"*, *"visionary"*). State engineering principles, mathematical formulations, constraints, and physical behavior directly and dispassionately.
+- **Focused Scope**: Maintain clear separation of concerns across documentation pages. For example, upstream project documentation (e.g., `docs/original_project.md`) must focus strictly on the original project's architecture, authors, repositories, and academic citations without introducing self-promotional comparisons or extraneous rationale.
+
 ---
 
 ## 3. Jekyll & Kramdown Configuration
