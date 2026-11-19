@@ -89,9 +89,3 @@ The SimpleFOC library was formally published in the *Journal of Open Source Soft
 > DOI: [10.21105/joss.04232](https://doi.org/10.21105/joss.04232)
 
 For complete BibTeX formatting, refer to [Citing SimpleFOC](/citing/).
-
----
-
-## 5. Algorithmic Parity Tracking
-
-BareFOC maintains an internal document, [`PARITY-REPORT.md`](https://github.com/bareFOC/bareFOC/blob/main/PARITY-REPORT.md), to track algorithmic equivalence across all functional modules against upstream releases of `Arduino-FOC` and `Arduino-FOC-drivers`.
