@@ -1,7 +1,7 @@
 ---
 layout: default
 title: "Citing SimpleFOC"
-nav_order: 11
+nav_order: 12
 permalink: /citing/
 ---
 

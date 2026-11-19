@@ -177,6 +177,8 @@ where
 
 ## Upstream Lineage & Attribution
 
-BareFOC is a port of the [Arduino-FOC](https://github.com/simplefoc/Arduino-FOC) and [Arduino-FOC-drivers](https://github.com/simplefoc/Arduino-FOC-drivers) libraries created by Antun Skuric and the SimpleFOC community. 
+BareFOC is a direct port of the foundational [Arduino-FOC](https://github.com/simplefoc/Arduino-FOC) and [Arduino-FOC-drivers](https://github.com/simplefoc/Arduino-FOC-drivers) libraries created by Antun Skuric and the SimpleFOC community. 
 
 BareFOC maintains strict fidelity to SimpleFOC's algorithms, naming conventions, and mathematical models to allow engineers familiar with SimpleFOC to transition seamlessly to embedded Rust, while contributing back architecture-neutral improvements to the open-source motion control ecosystem.
+
+For the full architectural history, upstream ecosystem links, academic citations, and attribution details, see the [Original Project](/original_project/) page.

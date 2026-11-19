@@ -43,11 +43,6 @@ nav_external_links:
     hide_icon: false
     fa_icon: "fab fa-github"
     opens_in_new_tab: true
-  - title: "Upstream SimpleFOC"
-    url: https://simplefoc.com
-    hide_icon: false
-    fa_icon: "fas fa-external-link-alt"
-    opens_in_new_tab: true
   - title: "Crates.io"
     url: https://crates.io/crates/barefoc
     hide_icon: false
