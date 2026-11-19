@@ -101,6 +101,7 @@ pub trait Transmission<const MOTORS: usize, const JOINTS: usize> {
 | **`FourBarLinkage`** | $1 \to 1$ | Non-linear Analytical | Exact closed-form Freudenstein equation, open/crossed branch selection |
 | **`EccentricCam`** | $1 \to 1$ | Non-linear Analytical | Rocker follower angle derived from eccentric crank geometry |
 | **`LutTransmission<N>`** | $1 \to 1$ | Non-linear Empirical | $\mathcal{O}(1)$ piecewise linear interpolation over $N$ uniform grid points |
+| **`DynamicTransmission<N>`** | $1 \to 1$ / $2 \to 2$ | Runtime Dynamic | Flat enum container wrapping all models for zero-heap runtime reconfiguration |
 
 ---
 
@@ -220,6 +221,50 @@ let jacobian = lut.jacobian_1d(motor_angle);
 
 ---
 
+### E. Dynamic Transmission Container (`DynamicTransmission<LUT_N>`)
+
+In reconfigurable robotic systems and multi-bus field actuators, mechanism kinematics may need to change dynamically at runtime (for example, switching from a direct gear drive to an analytical linkage or an empirical look-up table following auto-calibration). To avoid heap allocations (`Box<dyn Transmission>`) or virtual table dispatch penalties in `#![no_std]` real-time firmware, BareFOC provides the stack-allocated `DynamicTransmission<const LUT_N: usize>` enum:
+
+```rust
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DynamicTransmission<const LUT_N: usize> {
+    /// Linear gear reduction with backlash and compliance.
+    Linear(LinearGear),
+    /// Coupled 2-DOF differential transmission (wrist / gimbal).
+    Differential(CoupledDifferential),
+    /// Non-linear uniform Look-Up Table transmission.
+    Lut(LutTransmission<LUT_N>),
+    /// Planar four-bar linkage (Freudenstein analytical solution).
+    FourBar(FourBarLinkage),
+    /// Eccentric cam transmission.
+    Cam(EccentricCam),
+}
+```
+
+`DynamicTransmission` implements both `Transmission<1, 1>` and `Transmission<2, 2>`, delegating forward kinematics, inverse kinematics, and Jacobian matrix evaluations with inline static pattern matching:
+
+```rust,no_run
+use barefoc::kinematics::transmission::{
+    DynamicTransmission, LinearGear, FourBarLinkage, FourBarBranch, Transmission
+};
+
+// Initialize with linear gear
+let linear = LinearGear::new(10.0);
+let mut dyn_tx = DynamicTransmission::<65>::from(linear);
+
+// Evaluate 1-DOF forward kinematics
+let joint_pos: [f32; 1] = <DynamicTransmission<65> as Transmission<1, 1>>::forward(&dyn_tx, &[10.0]);
+
+// Reconfigure dynamically at runtime to an analytical four-bar linkage
+let four_bar = FourBarLinkage::new(0.120, 0.040, 0.100, 0.060, FourBarBranch::Open);
+dyn_tx = DynamicTransmission::FourBar(four_bar);
+
+// Evaluate with new linkage kinematics without rebooting or heap allocation
+let linkage_pos: [f32; 1] = <DynamicTransmission<65> as Transmission<1, 1>>::forward(&dyn_tx, &[0.5]);
+```
+
+---
+
 ## 3. Cascaded Dual-Loop Actuator Control
 
 High-performance robotic actuators typically feature **dual encoders**:
@@ -274,6 +319,74 @@ loop {
 
 ---
 
+### Multi-Axis Actuator Assembly (`ActuatorAssembly<M, S>`)
+
+For robotic platforms requiring coordinated multi-axis motion, dynamic differential decoupling, and arbitrary sensor-to-motor routing, BareFOC provides `ActuatorAssembly<const M: usize, const S: usize>` (defaults to $M=4$ motor axes and $S=4$ sensor channels).
+
+`ActuatorAssembly` supervises:
+- Inner high-frequency motor commutation loops (10 kHz - 25 kHz)
+- Decimated outer discrete-time joint position PID loops (e.g., 500 Hz - 1 kHz)
+- Runtime-reconfigurable kinematic topologies via `TopologyPreset`
+- Flexible sensor pool multiplexing (`sensor_map: [u8; M]`)
+- Global bus voltage monitoring (`vbus_voltage`) and auto-calibration sequencing
+
+#### Kinematic Topology Presets (`TopologyPreset`)
+
+Mechanisms can be reconfigured dynamically between standard multi-axis arrangements or custom configurations:
+
+| Topology Preset | Value | Coupling Mask | Description |
+|---|:---:|:---:|---|
+| **`Four1Dof`** | `0` | `0x00` | 4 independent 1-DOF joint axes. Each motor drives a single dedicated joint. |
+| **`Two2Dof`** | `1` | `0x03` | 2 independent 2-DOF coupled differential joint pairs: motors `[0, 1]` drive differential gimbal 0 (Pitch/Roll), and motors `[2, 3]` drive differential gimbal 1 (Pitch/Roll). |
+| **`One1DofOne2Dof`** | `2` | `0x04` | 1 independent 1-DOF joint (motor 0) and 1 coupled 2-DOF differential joint pair (motors `[1, 2]`). |
+| **`Two1DofOne2Dof`** | `3` | `0x02` | 2 independent 1-DOF joints (motors 0 and 1) and 1 coupled 2-DOF differential joint pair (motors `[2, 3]`). |
+| **`Custom`** | `0xFF` | User-defined | Custom topology mapping driven by arbitrary coupling bitmasks. |
+
+#### Dynamic Sensor Channel Routing (`TopologyConfig`)
+
+Joint feedback sensors (encoders, resolvers, optical sensors) often differ in physical bus addresses or connector pinouts from motor inverter channels. The `TopologyConfig` descriptor maps sensor channel indices from the global sensor pool to motor/joint indices:
+
+```rust
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TopologyConfig {
+    pub preset: TopologyPreset,
+    pub sensor_map: [u8; 4],     // sensor_map[motor_index] = sensor_pool_channel
+    pub coupling_mask: u8,
+}
+```
+
+This mapping allows any sensor channel in the assembly's sensor pool to feed any motor axis:
+
+```rust,no_run
+use barefoc::kinematics::assembly::{ActuatorAssembly, TopologyPreset};
+
+let mut assembly = ActuatorAssembly::<4, 4>::new();
+
+// Set active topology to Two2Dof (2x 2-DOF differential gimbals)
+assembly.set_topology(TopologyPreset::Two2Dof);
+
+// Route sensor channel 2 to motor axis 0, and sensor channel 0 to motor axis 1
+assembly.set_sensor_mapping(0, 2);
+assembly.set_sensor_mapping(1, 0);
+
+// Configure outer position loop setpoints (in radians)
+assembly.set_joint_target(0, 1.5708); // Gimbal 0 pitch setpoint
+assembly.set_joint_target(1, 0.7854); // Gimbal 0 roll setpoint
+
+// Run synchronous step across all motors, sensors, and kinematics loops
+assembly.step_all(&mut motors, &mut sensors, &clock);
+```
+
+#### Assembly Telemetry Structures
+
+`ActuatorAssembly` maintains continuous real-time state for each axis:
+- `motors: [MotorAxisTelemetry; M]`: Target setpoint, measured current, rotor shaft angle, shaft velocity, assigned sensor channel, and velocity limit.
+- `joints: [JointTelemetry; M]`: Target position setpoint, present position, present velocity, gear ratio, backlash amplitude, and outer PID gains ($K_p, K_i, K_d$).
+- `calib: CalibTelemetry`: Command ID, state machine phase, completion percentage progress (0..100%), and non-volatile flash status.
+
+---
+
 ## 4. On-Device Auto-Calibration
 
 BareFOC includes automated calibration state machines that discover mechanical limits, measure hysteresis, and record non-linear transmission curves directly on embedded hardware.
@@ -316,7 +429,7 @@ let calibrated_lut = result.lut;
 
 ## 5. Non-Volatile Flash Storage (`FlashCalibrationData`)
 
-Calibration results are packed into a 64-byte quadword-aligned binary header designed for direct programming into microcontroller non-volatile flash memory sectors:
+Calibration results, kinematic parameters, and multi-axis topology routing are packed into a 64-byte quadword-aligned binary header designed for direct programming into microcontroller non-volatile flash memory sectors:
 
 ```rust
 #[repr(C, align(64))]
@@ -333,8 +446,9 @@ pub struct FlashCalibrationData {
     pub lut_mot_min: f32,         // LUT range minimum motor angle (rad)
     pub lut_mot_max: f32,         // LUT range maximum motor angle (rad)
     pub lut_points: u16,          // Number of points in LUT table
-    pub reserved: [u8; 18],       // Reserved padding for alignment
-    pub checksum: u32,            // CRC32 checksum over the preceding 60 bytes
+    pub topology: TopologyConfig, // Multi-axis topology preset and sensor routing
+    pub reserved: [u8; 12],       // Quadword alignment padding
+    pub checksum: u32,            // IEEE 802.3 CRC32 checksum over preceding 60 bytes
 }
 ```
 
@@ -352,5 +466,34 @@ pub struct FlashCalibrationData {
 | `0x18` – `0x1F` | `joint_min`, `joint_max` | `f32`, `f32` | Calibrated mechanical travel limits (rad) |
 | `0x20` – `0x27` | `lut_mot_min`, `lut_mot_max` | `f32`, `f32` | Non-linear LUT input range bounds |
 | `0x28` – `0x29` | `lut_points` | `u16` | Number of discretized interpolation samples |
-| `0x2A` – `0x3B` | `reserved` | `[u8; 18]` | Quadword alignment padding |
-| `0x3C` – `0x3F` | `checksum` | `u32` | CRC32 data integrity checksum |
+| `0x2A` – `0x2F` | `topology` | `TopologyConfig` | Topology preset (`u8`), sensor routing map (`[u8; 4]`), coupling mask (`u8`) |
+| `0x30` – `0x3B` | `reserved` | `[u8; 12]` | Reserved padding for 64-byte alignment |
+| `0x3C` – `0x3F` | `checksum` | `u32` | IEEE 802.3 CRC32 data integrity checksum over `0x00..0x3C` |
+
+### CRC32 Verification & Serialization APIs
+
+Data integrity is protected with the standard IEEE 802.3 CRC32 polynomial (`0xEDB8_8320` reversed / `0x04C1_1DB7` forward), computed strictly over the 60 payload bytes (`0x00..=0x3B`).
+
+```rust,no_run
+use barefoc::kinematics::calibration::storage::{FlashCalibrationData, save_to_flash, load_from_flash};
+
+// 1. Prepare calibration parameters
+let mut data = FlashCalibrationData::default();
+data.gear_ratio = 42.0;
+data.backlash_delta = 0.003;
+
+// 2. Serialize to a 64-byte aligned block with automatically computed CRC32
+let block: [u8; 64] = data.serialize_to_block();
+// Alternatively via the module-level helper:
+// let block = save_to_flash(&data);
+
+// 3. Write 'block' directly into MCU flash page via embedded-storage / platform driver
+// flash_driver.write(FLASH_SECTOR_ADDR, &block)?;
+
+// 4. Restore and verify on boot
+let restored = FlashCalibrationData::deserialize_from_block(&block)
+    .expect("Flash calibration valid and CRC32 verified");
+
+// 5. Apply restored topology and kinematics directly to the actuator assembly
+assembly.load_from_flash(&restored);
+```

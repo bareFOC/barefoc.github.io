@@ -8,13 +8,13 @@ permalink: /communication/commander/
 
 # Commander Protocol (`barefoc-commander`)
 
-`barefoc-commander` is a pure-Rust, `#![no_std]` ASCII command processor implementing the SimpleFOC `commands.h` grammar. It operates generically over any byte stream implementing `embedded_io::Read` and `embedded_io::Write` (UART, USB CDC, RTT, or TCP).
+`barefoc-commander` is a pure-Rust, `#![no_std]` ASCII command processor implementing the SimpleFOC `commands.h` grammar and extending it with multi-axis robotics kinematics. It operates generically over any byte stream implementing `embedded_io::Read` and `embedded_io::Write` (UART, USB CDC, RTT, or TCP).
 
 ---
 
-## Command Grammar
+## 1. Single-Motor Command Grammar
 
-A command consists of an identifier character, an optional sub-command, and a floating-point value:
+A motor command consists of an identifier character, an optional sub-command, and a floating-point value:
 
 ```
 [Command][SubCommand] [Value]\n
@@ -23,7 +23,7 @@ A command consists of an identifier character, an optional sub-command, and a fl
 ### Motor Command Reference:
 
 | Command | Parameter / Action | Example | Response |
-|---|---|---|---|
+|:---:|---|---|---|
 | `T` | Set target motion setpoint (V, rad/s, rad) | `T 20.5` | Target updated to 20.5 |
 | `M` | Change motion control mode (`0`=torque, `1`=velocity, `2`=angle) | `M 1` | Velocity mode active |
 | `C` | Change torque control mode (`0`=voltage, `1`=dc_curr, `2`=foc_curr) | `C 0` | Voltage mode active |
@@ -34,32 +34,121 @@ A command consists of an identifier character, an optional sub-command, and a fl
 
 ---
 
-## Output Verbosity Modes
+## 2. Robotics Kinematics Command Hierarchy (`KinematicsCommander`)
 
-Output formatting can be adjusted via `VerbosityMode`:
+The dedicated `'K'` command identifier exposes complete interactive console tuning, telemetry streaming, dynamic sensor channel routing, and calibration sequencing for multi-axis robotic mechanisms.
 
-- **`Nothing`**: Completely silent (zero byte overhead).
-- **`Minimal`**: Returns only raw numeric feedback.
-- **`UserFriendly`**: Returns descriptive labels (e.g., `PID vel| P: 0.100, I: 1.000`).
-- **`MachineReadable`**: Formatted key-value pairs for automated parsing scripts.
+Commands can be invoked directly (e.g. `KT 0 1.57`) or prefixed with `K` under a commander router (e.g. `K KT 0 1.57`):
+
+```
+K[SubCommand] [JointIndex] [Value]\n
+```
+
+### A. Topology & Sensor Routing Subcommands
+
+| Command | Arguments | Purpose | Example | Description |
+|---|---|---|---|---|
+| `KM` | `<mode>` | Topology preset mode | `KM 1` | Sets topology preset: `0`=Four1Dof, `1`=Two2Dof, `2`=One1DofOne2Dof, `3`=Two1DofOne2Dof, `255`=Custom. Bare `KM` queries active mode. |
+| `KS` | `<mot>:<ch>` / `<mot>` | Sensor routing map | `KS 0:2` | Assigns sensor channel 2 to motor axis 0. `KS 0` queries motor 0 routing; bare `KS` prints all 4 sensor mappings. |
+| `KX` | `<mask>` | 2-DOF coupling bitmask | `KX 3` | Sets bitmask indicating coupled differential joint pairs (e.g. `0x03` couples axes [0, 1] and [2, 3]). |
 
 ---
 
-## Rust Integration Example
+### B. Joint Targets & Real-Time Telemetry
+
+| Command | Arguments | Purpose | Example | Description |
+|---|---|---|---|---|
+| `KT` | `[<j>] [<val>]` | Joint target position | `KT 0 1.5708` | Sets target position setpoint for joint `j` (in radians). Bare `KT` prints targets for all joints. |
+| `KA` | `[<j>]` | Joint feedback angle | `KA 0` | Reads measured joint angle from the assigned sensor channel (radians). |
+| `KV` | `[<j>]` | Joint feedback velocity | `KV 0` | Reads measured joint velocity from the assigned sensor channel (rad/s). |
+
+---
+
+### C. Transmission Parameters
+
+| Command | Arguments | Purpose | Example | Description |
+|---|---|---|---|---|
+| `KG` | `<j> <val>` | Gear reduction ratio | `KG 0 50.0` | Sets kinematic gear ratio ($R$) for joint `j`. |
+| `KB` | `<j> <val>` | Backlash deadband amplitude | `KB 0 0.003` | Sets backlash half-deadband $\delta$ (radians) for joint `j`. |
+| `KW` | `<j> <val>` | Velocity smoothing threshold | `KW 0 0.05` | Sets smooth tanh transition threshold $\omega_{\text{thresh}}$ (rad/s). |
+| `KK` | `<j> <val>` | Torsional stiffness | `KK 0 1500.0` | Sets torsional compliance $K_{\text{gear}}$ (Nm/rad). |
+| `KZ` | `<j> <val>` | Joint zero offset | `KZ 0 0.125` | Sets mechanical zero offset (radians) for joint `j`. |
+
+---
+
+### D. Outer Cascaded Joint PID Regulators
+
+| Command | Arguments | Purpose | Example | Description |
+|---|---|---|---|---|
+| `KP` | `<j> <val>` | Proportional gain ($K_p$) | `KP 0 25.0` | Sets outer position loop proportional gain. |
+| `KI` | `<j> <val>` | Integral gain ($K_i$) | `KI 0 0.5` | Sets outer position loop integral gain. |
+| `KD` | `<j> <val>` | Derivative gain ($K_d$) | `KD 0 0.08` | Sets outer position loop derivative gain. |
+| `KL` | `<j> <val>` | Velocity output limit | `KL 0 15.0` | Clamps commanded velocity output to $\pm 15.0$ rad/s. |
+| `KR` | `<j> <val>` | Acceleration ramp limit | `KR 0 100.0` | Caps outer loop output acceleration ramp to $100.0\ \text{rad/s}^2$. |
+| `KN` | `<j> <int>` | Loop decimation factor | `KN 0 10` | Decimates outer position loop to execute once every 10 inner FOC ticks. |
+
+---
+
+### E. Calibration Sequencing & Flash Status
+
+| Command | Arguments | Purpose | Description |
+|---|---|---|---|
+| `KC` | `<cmd>` | Calibration action | Dispatches calibration commands: `KC 1` = Start stall sweep / autonomous limit search, `KC 2` = Abort procedure, `KC 3` = Save calibration to flash, `KC 4` = Load calibration from flash, `KC 8` = Reset state machine to idle. Bare `KC` returns current state (`0`=Idle, `1`=Running, `2`=Done, `3`=Error). |
+| `KF` | `[<status>]` | Flash CRC32 status | Queries or sets flash calibration validity (`1`=Valid and CRC32 verified, `0`=Uninitialized or CRC mismatch). |
+
+---
+
+## 3. Four-Axis Assembly Dispatcher (`Commander4Axis`)
+
+`barefoc-commander` provides the `Commander4Axis` helper, which binds motor axes `'A'`, `'B'`, `'C'`, `'D'` and kinematics `'K'` under a single command router:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Incoming ASCII Command Stream (e.g. "B T 10.0\n")      │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+           ┌──────────────────────────────────┐
+           │ Commander4Axis Command Router    │
+           └──────┬───────┬───────┬───────┬───┘
+                  │       │       │       │   'K'
+      'A'         │   'B' │   'C' │   'D' │    │
+       ▼          ▼       ▼       ▼       ▼    ▼
+    [Motor A]  [Motor B] [Motor C] [Motor D] [Kinematics]
+```
+
+### Rust Example:
 
 ```rust,no_run
-use barefoc_commander::{Commander, LineProcessor};
-use barefoc_commander::motor::MotorCommander;
-use embedded_io::{Read, Write};
+use barefoc_commander::Commander4Axis;
+use barefoc::motor::base::NullClock;
 
-pub fn poll_serial<IO: Read + Write>(io: &mut IO, motor: &mut BLDCMotor) {
-    let mut line_buf = [0u8; 64];
-    let mut processor = LineProcessor::new(&mut line_buf);
+let clock = NullClock;
+let mut cmd4 = Commander4Axis::new_with_clock(&clock);
 
-    let mut commander = Commander::new();
-    commander.add_motor('M', motor);
+// 1. Command motor B to 10 rad/s velocity
+cmd4.run("B T 10.0\n");
 
-    // Reads incoming bytes from UART / RTT, parses lines, and dispatches commands
-    processor.process(io, &mut commander);
-}
+// 2. Set kinematics topology to Two2Dof (2x 2-DOF differential gimbals)
+cmd4.run("K KM 1\n");
+
+// 3. Route sensor pool channel 3 to motor axis 2
+cmd4.run("K KS 2:3\n");
+
+// 4. Command target position for joint 0 to 1.57 rad
+cmd4.run("K KT 0 1.57\n");
+
+// 5. Query measured joint angle on joint 0
+cmd4.run("K KA 0\n");
 ```
+
+---
+
+## 4. Output Verbosity Modes
+
+Output formatting across both motor and kinematics commands can be adjusted via `VerboseMode`:
+
+- **`Nothing`**: Completely silent execution (zero byte overhead).
+- **`Minimal`**: Returns only raw numeric values (ideal for embedded microcontrollers and lightweight parsers).
+- **`UserFriendly`**: Returns descriptive labels and engineering units (e.g., `Kinematics| Mode: Two2Dof, J0 target: 1.570 rad`).
+- **`MachineReadable`**: Formatted key-value pairs (`K:KM=1`, `K:KT0=1.570`) for host plotting tools and telemetry loggers.
