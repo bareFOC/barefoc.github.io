@@ -1,33 +1,38 @@
 ---
 layout: default
-title: Contact and Contributing
-nav_order: 9
-description: "Arduino Simple Field Oriented Control (FOC) library ."
-permalink: /contact
+title: "Contributing & Community"
+nav_order: 12
+description: "Community, issues, and contributing to BareFOC."
+permalink: /contact/
 ---
 
-<h1><i class="fa fa-lg"><svg id="fab-discourse" style="width:30px;fill:#44a8fa" viewBox="0 0 448 512"><path d="M225.9 32C103.3 32 0 130.5 0 252.1 0 256 .1 480 .1 480l225.8-.2c122.7 0 222.1-102.3 222.1-223.9C448 134.3 348.6 32 225.9 32zM224 384c-19.4 0-37.9-4.3-54.4-12.1L88.5 392l22.9-75c-9.8-18.1-15.4-38.9-15.4-61 0-70.7 57.3-128 128-128s128 57.3 128 128-57.3 128-128 128z"></path> </svg></i> <span class="simple">Simple<span class="foc">FOC</span> Community</span></h1>
+# Contributing & Community
 
+BareFOC is an open-source project developed for the embedded Rust and motor control communities.
 
-For all the questions regarding the potential implementation, applications, supported hardware and similar please visit our [community forum](https://community.simplefoc.com) 
+---
 
-It is always helpful to hear the stories/problems/suggestions of people implementing the code and you might find a lot of answered questions there already! 
+## GitHub Issues & Discussions
 
-<div class="image_icon width80" >
-    <a href="https://community.simplefoc.com" target="_blank">
-        <img src="extras/Images/community.png" >
-        <i class="fa fa-external-link-square fa-2x"></i>
-    </a>
-</div>
+- **Repository**: [https://github.com/bareFOC/bareFOC](https://github.com/bareFOC/bareFOC)
+- **Bug Reports & Feature Requests**: Submit issues via the [GitHub Issue Tracker](https://github.com/bareFOC/bareFOC/issues).
+- **Discussions**: Architectural proposals, questions, and hardware showcase in [GitHub Discussions](https://github.com/bareFOC/bareFOC/discussions).
 
+---
 
+## Upstream SimpleFOC Community
 
-## Github Issues & Pull requests
+For general motor control theory, hardware shield fabrication questions, and motor tuning discussions, the upstream SimpleFOC community remains an invaluable resource:
 
-Please do not hesitate to leave an issue if you have problems/advices/suggestions regarding the code!
+- **SimpleFOC Community Forum**: [https://community.simplefoc.com](https://community.simplefoc.com)
+- **SimpleFOC Main Site**: [https://simplefoc.com](https://simplefoc.com)
 
-Pull requests are welcome, but let's first discuss them in [community forum](https://community.simplefoc.com)!
+---
 
-## Direct Contact
-For very serious questions 😄:
-[simplefoc.com](https://simplefoc.com/contact)
+## Contribution Guidelines
+
+Contributions are welcome! Before submitting a pull request:
+1. Ensure all code complies with `#![no_std]`.
+2. Verify that floating-point math uses `libm` and contains zero dynamic memory allocations.
+3. Add unit tests running on the host under `cargo test` where applicable.
+4. Format your code using `cargo fmt` and verify with `cargo clippy`.

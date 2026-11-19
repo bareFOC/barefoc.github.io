@@ -1,27 +1,29 @@
 ---
 layout: default
-title: Citing <span class="simple">Simple<span class="foc">FOC</span></span>
-nav_order: 8
-permalink: /citing
+title: "Citing BareFOC & SimpleFOC"
+nav_order: 11
+permalink: /citing/
 ---
 
-# Citing <span class="simple">Simple<span class="foc">FOC</span></span> 
+# Citing BareFOC & SimpleFOC
 
-We are very happy that *Simple**FOC**library* has been used as a component of several research project and has made its way to several scientific papers.  We are hoping that this trend is going to continue as the project matures and becomes more robust! 
-A short resume paper about *Simple**FOC*** has been published in the Journal of Open Source Software: 
-<p>
-  <b><i>SimpleFOC</i></b>: A Field Oriented Control (FOC) Library for Controlling Brushless Direct Current (BLDC) and Stepper Motors.<br>
-  A. Skuric, HS. Bank, R. Unger, O. Williams, D. González-Reyes<br>
-Journal of Open Source Software, 7(74), 4232, https://doi.org/10.21105/joss.04232
-</p>
+BareFOC is directly ported from and inspired by the SimpleFOC project created by Antun Skuric and the SimpleFOC community.
 
-If you are interested in citing  *Simple**FOC**library* or some other component of *Simple**FOC**project* in your research, we suggest you to cite our paper:
+If you use BareFOC in an academic paper, research project, or engineering publication, please cite both BareFOC and the foundational SimpleFOC paper:
 
+---
 
+## 1. Citing the Foundational SimpleFOC Paper
 
-<div class="highlight">
-<code class="highlighter-rouge">
-<pre>
+A description of the core FOC algorithms and motor models is published in the *Journal of Open Source Software*:
+
+> **SimpleFOC: A Field Oriented Control (FOC) Library for Controlling Brushless Direct Current (BLDC) and Stepper Motors**  
+> A. Skuric, H. S. Bank, R. Unger, O. Williams, D. González-Reyes  
+> *Journal of Open Source Software*, 7(74), 4232 (2022).  
+> DOI: [10.21105/joss.04232](https://doi.org/10.21105/joss.04232)
+
+### BibTeX Entry:
+```bibtex
 @article{simplefoc2022,
   doi = {10.21105/joss.04232},
   url = {https://doi.org/10.21105/joss.04232},
@@ -34,10 +36,17 @@ If you are interested in citing  *Simple**FOC**library* or some other component 
   title = {SimpleFOC: A Field Oriented Control (FOC) Library for Controlling Brushless Direct Current (BLDC) and Stepper Motors},
   journal = {Journal of Open Source Software}
 }
-</pre>
-</code>
-</div>
+```
 
+---
 
-## <b><i>SimpleFOC</i></b>: A Field Oriented Control (FOC) Library for Controlling Brushless Direct Current (BLDC) and Stepper Motors.
-<object data="https://www.theoj.org/joss-papers/joss.04232/10.21105.joss.04232.pdf" width="1000" height="1000" type='application/pdf'></object>
+## 2. Citing BareFOC
+
+```bibtex
+@software{barefoc2026,
+  author = {BareFOC Contributors},
+  title = {BareFOC: Pure-Rust, no_std Field Oriented Control Library for Embedded Systems},
+  url = {https://github.com/bareFOC/bareFOC},
+  year = {2026}
+}
+```
