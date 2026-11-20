@@ -177,7 +177,7 @@ pub fn run_fibre_assembly<IO: Read + Write>(io: &mut IO, assembly: &mut Actuator
 
 ## 5. Smart Servo Fibre Schema & RPCs (`barefoc-fibre::servo`)
 
-For actuators using the unified 176-byte `ControlTable`, `barefoc-fibre::servo` provides `create_smart_servo_schema()` and `create_smart_servo_endpoints()`.
+For actuators using the unified 384-byte `ControlTable`, `barefoc-fibre::servo` provides `create_smart_servo_schema()` and `create_smart_servo_endpoints()`.
 
 This schema exposes:
 - **`eeprom` Object**: `node_id`, `operating_mode`, `current_limit`, `velocity_limit`, `position_p`, `velocity_p`, `current_p`.

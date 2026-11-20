@@ -196,7 +196,7 @@ loop {
 
 ## 4. Universal Control Table Profile (`control_table_profile`)
 
-For Dynamixel-grade actuators utilizing the 176-byte `ControlTable`, `barefoc-multibus` provides `control_table_profile::<C>()`. This profile maps the entire register range `0x00..=0xAF`, enables high-speed 32-byte burst reads, and binds hardware persistence hooks:
+For Dynamixel-grade actuators utilizing the 384-byte `ControlTable`, `barefoc-multibus` provides `control_table_profile::<C>()`. This profile maps the registered parameters, enables high-speed 32-byte burst reads, and binds hardware persistence hooks:
 
 ```mermaid
 sequenceDiagram

@@ -27,7 +27,7 @@ sequenceDiagram
     participant SRAM as SRAM Mailbox (_stack_end)
     participant Boot as Katapult Bootloader (0x0800_0000)
 
-    Host->>App: Hand-off trigger (!BOOT, 0x63, RPC, CAN 0x7F)
+    Host->>App: Hand-off trigger (!BOOT, 0x123, RPC, CAN 0x7F)
     App->>Inverter: Disarm PWM into high-Z Coast mode
     App->>App: Disable global interrupts (cortex_m::interrupt::disable)
     App->>SRAM: Write REQUEST_BOOTLOADER (0x5984_E3FA_6CA1_589B)
@@ -103,7 +103,7 @@ The bootloader hand-off can be initiated through any supported communication pro
 
 | Bus Interface | Invocation Syntax / Payload | Handling Module |
 |---|---|---|
-| **MultiBus I2C / SPI** | Write `0xF0` to `RebootCommand` (`0x63`) | `barefoc-multibus::control_table_profile` |
+| **MultiBus I2C / SPI** | Write `0xF0` to `RebootCommand` (`0x123`) | `barefoc-multibus::control_table_profile` |
 | **Commander ASCII** | Command `!BOOT\n` | `barefoc-commander::SmartServoCommander` |
 | **Fibre RPC** | Call method `reboot_bootloader()` | `barefoc-fibre::servo` |
 | **CAN Bus** | Send frame `0x07F` with token `0x5984_E3FA_6CA1_589B` | `barefoc::communication::can` |

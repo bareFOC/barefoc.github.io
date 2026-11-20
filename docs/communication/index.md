@@ -55,7 +55,7 @@ flowchart TD
    Binary packetized RPC engine natively compatible with the official [ODrive Web GUI](https://gui.odriverobotics.com) and `odrivetool` for real-time oscilloscope plotting and interactive slider tuning.
 
 3. [**Multibus Register Protocol**](/communication/multibus/):
-   Descriptor-driven control table framework for address-based multi-drop buses (I2C, SPI, I3C), including the 176-byte universal smart servo profile.
+   Descriptor-driven control table framework for address-based multi-drop buses (I2C, SPI, I3C), including the 384-byte universal smart servo profile.
 
 4. [**CAN Bus Protocol**](/communication/can/):
    Standardized 8-byte CAN frame layouts for setpoints, telemetry feedback, and bootloader hand-off.

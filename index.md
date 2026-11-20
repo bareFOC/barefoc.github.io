@@ -44,7 +44,7 @@ graph TD
     subgraph App ["Application & High-Level Control"]
         COM["barefoc-comms<br/>Commander • Fibre RPC • Multibus • CAN • RTT"]
         KIN["bareFOC::kinematics<br/>Transmissions • Joint Kinematics • Trajectory Profiling"]
-        TABLE["bareFOC::control_table<br/>Universal 176-Byte Control Table • EEPROM/RAM Partitioning"]
+        TABLE["bareFOC::control_table<br/>Universal 384-Byte Control Table • EEPROM/RAM Partitioning"]
     end
 
     subgraph Core ["bareFOC (Core Engine — #![no_std])"]
@@ -83,11 +83,11 @@ graph TD
 | **`bareFOC::math`** | Coordinate transforms & modulation | Forward/Inverse Clarke, Forward/Inverse Park, Space Vector PWM (SVPWM), Sine PWM, Trapezoidal modulation |
 | **`bareFOC::common`** | Discrete-time signal conditioning | `PIDController` (anti-windup, ramp limit, derivative filter), `LowPassFilter`, monotonic `Clock` |
 | **`bareFOC::motor`** | Actuator state machines | `BLDCMotor`, `StepperMotor`, `HybridStepperMotor`, `DCMotor`, open/closed-loop velocity and angle control |
-| **`bareFOC::control_table`**| Universal actuator register map | Standardized 176-byte Control Table (96-byte EEPROM + 80-byte RAM), 8 operating modes, kinematics topology presets, soft limits, `HardwareErrorStatus` bitfield |
+| **`bareFOC::control_table`**| Universal actuator register map | Standardized 384-byte Control Table (224-byte EEPROM + 160-byte RAM), 4-axis motor bank, 8 operating modes, kinematics topology presets, soft limits, `HardwareErrorStatus` bitfield |
 | **`bareFOC::kinematics`** | Transmission & motion profiling | Reduction ratios, leadscrews, 1-DOF / 2-DOF kinematics, `TrapezoidalTrajectory` generator, `MultiTurnAccumulator` unwrapping, joint homing and calibration |
 | **`bareFOC::traits`** | Core device & persistence interfaces | `FOCMotor`, `FOCDriver`, `BLDCDriver`, `Sensor`, `CurrentSense`, `ConfigStorage`, `BootloaderHandoff` |
 | **`barefoc-drivers`** | Extended sensors and gate driver ICs | `AS5600`, `AS5048A/B`, `AS5047P`, `mt6xxx-rs` (MT6701 SSI), `drv83xx-rs` (DRV8316, DRV8311), `tmag-rs` (TMAG5273 3D Hall), `DCDriver2PWM` |
-| **`barefoc-comms`** | Telemetry and bus commanding | `barefoc-commander` (SmartServoCommander & ASCII parser), `barefoc-fibre` (ODrive GUI RPC), `barefoc-multibus` (176-byte Control Table profile), CAN frame mapping, `barefoc-rtt` (SWD stream) |
+| **`barefoc-comms`** | Telemetry and bus commanding | `barefoc-commander` (SmartServoCommander & ASCII parser), `barefoc-fibre` (ODrive GUI RPC), `barefoc-multibus` (384-byte Control Table profile), CAN frame mapping, `barefoc-rtt` (SWD stream) |
 | **`barefoc-hal`** | Silicon-level peripheral glue | Complementary 6-PWM with dead-time, timer quadrature encoders, CORDIC math, OPAMPs, `H5FlashStorage` ping-pong flash, `Stm32H5Bootloader` hand-off |
 | **`barefoc-sim`** | Host-based electromechanical SIL | Coupled $d$-$q$ electrical and Newtonian rotational physics ODE solver, live TCP Fibre GUI server |
 
