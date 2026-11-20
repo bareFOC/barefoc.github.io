@@ -42,15 +42,16 @@ The BareFOC project is organized as a modular workspace of focused crates:
 ```mermaid
 graph TD
     subgraph App ["Application & High-Level Control"]
-        COM["barefoc-comms<br/>Commander • Fibre RPC • Multibus • RTT"]
-        KIN["bareFOC::kinematics<br/>Transmissions • Joint Kinematics • Homing"]
+        COM["barefoc-comms<br/>Commander • Fibre RPC • Multibus • CAN • RTT"]
+        KIN["bareFOC::kinematics<br/>Transmissions • Joint Kinematics • Trajectory Profiling"]
+        TABLE["bareFOC::control_table<br/>Universal 176-Byte Control Table • EEPROM/RAM Partitioning"]
     end
 
     subgraph Core ["bareFOC (Core Engine — #![no_std])"]
         MOTOR["bareFOC::motor<br/>BLDCMotor • StepperMotor • Hybrid • DCMotor"]
         MATH["bareFOC::math<br/>Clarke • Park • SVPWM • SinePWM"]
         COMMON["bareFOC::common<br/>PIDController • LowPassFilter • Clock"]
-        TRAITS["bareFOC::traits<br/>FOCMotor • BLDCDriver • Sensor • CurrentSense"]
+        TRAITS["bareFOC::traits<br/>FOCMotor • BLDCDriver • Sensor • CurrentSense • Storage • Bootloader"]
     end
 
     subgraph Drivers ["barefoc-drivers"]
@@ -59,12 +60,13 @@ graph TD
     end
 
     subgraph Target ["Hardware Targets & SIL Simulation"]
-        HAL["barefoc-hal<br/>STM32 • ESP32 • CH32 RISC-V"]
+        HAL["barefoc-hal<br/>STM32 (Flash/Boot) • ESP32 • CH32 RISC-V"]
         SIM["barefoc-sim<br/>Coupled ODE Physics • Sub-stepped SIL"]
     end
 
     COM --> MOTOR
     KIN --> MOTOR
+    TABLE --> MOTOR
     MOTOR --> MATH
     MOTOR --> COMMON
     MOTOR --> TRAITS
@@ -80,11 +82,13 @@ graph TD
 |---|---|---|
 | **`bareFOC::math`** | Coordinate transforms & modulation | Forward/Inverse Clarke, Forward/Inverse Park, Space Vector PWM (SVPWM), Sine PWM, Trapezoidal modulation |
 | **`bareFOC::common`** | Discrete-time signal conditioning | `PIDController` (anti-windup, ramp limit, derivative filter), `LowPassFilter`, monotonic `Clock` |
-| **`bareFOC::motor`** | Actuator state machines | `BLDCMotor`, `StepperMotor`, `HybridStepperMotor`, open/closed-loop velocity and angle control |
-| **`bareFOC::kinematics`** | Transmission & coordinate mapping | Reduction ratios, leadscrews, 1-DOF / 2-DOF kinematics, joint homing and calibration |
+| **`bareFOC::motor`** | Actuator state machines | `BLDCMotor`, `StepperMotor`, `HybridStepperMotor`, `DCMotor`, open/closed-loop velocity and angle control |
+| **`bareFOC::control_table`**| Universal actuator register map | Standardized 176-byte Control Table (96-byte EEPROM + 80-byte RAM), 8 operating modes, kinematics topology presets, soft limits, `HardwareErrorStatus` bitfield |
+| **`bareFOC::kinematics`** | Transmission & motion profiling | Reduction ratios, leadscrews, 1-DOF / 2-DOF kinematics, `TrapezoidalTrajectory` generator, `MultiTurnAccumulator` unwrapping, joint homing and calibration |
+| **`bareFOC::traits`** | Core device & persistence interfaces | `FOCMotor`, `FOCDriver`, `BLDCDriver`, `Sensor`, `CurrentSense`, `ConfigStorage`, `BootloaderHandoff` |
 | **`barefoc-drivers`** | Extended sensors and gate driver ICs | `AS5600`, `AS5048A/B`, `AS5047P`, `mt6xxx-rs` (MT6701 SSI), `drv83xx-rs` (DRV8316, DRV8311), `tmag-rs` (TMAG5273 3D Hall), `DCDriver2PWM` |
-| **`barefoc-comms`** | Telemetry and bus commanding | `barefoc-commander` (ASCII parser), `barefoc-fibre` (ODrive GUI RPC), `barefoc-multibus` (register table), `barefoc-rtt` (SWD stream) |
-| **`barefoc-hal`** | Silicon-level peripheral glue | Complementary 6-PWM with hardware dead-time, hardware QEI timer encoders, CORDIC math, OPAMP configuration |
+| **`barefoc-comms`** | Telemetry and bus commanding | `barefoc-commander` (SmartServoCommander & ASCII parser), `barefoc-fibre` (ODrive GUI RPC), `barefoc-multibus` (176-byte Control Table profile), CAN frame mapping, `barefoc-rtt` (SWD stream) |
+| **`barefoc-hal`** | Silicon-level peripheral glue | Complementary 6-PWM with dead-time, timer quadrature encoders, CORDIC math, OPAMPs, `H5FlashStorage` ping-pong flash, `Stm32H5Bootloader` hand-off |
 | **`barefoc-sim`** | Host-based electromechanical SIL | Coupled $d$-$q$ electrical and Newtonian rotational physics ODE solver, live TCP Fibre GUI server |
 
 ---

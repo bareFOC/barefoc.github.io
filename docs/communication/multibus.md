@@ -191,3 +191,72 @@ loop {
     // On I2C read:  server.on_read(req_len, &mut tx_buffer)?;
 }
 ```
+
+---
+
+## 4. Universal Control Table Profile (`control_table_profile`)
+
+For Dynamixel-grade actuators utilizing the 176-byte `ControlTable`, `barefoc-multibus` provides `control_table_profile::<C>()`. This profile maps the entire register range `0x00..=0xAF`, enables high-speed 32-byte burst reads, and binds hardware persistence hooks:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Host as Bus Master (I2C/SPI)
+    participant Server as MultiBus RegServer
+    participant Table as ControlTable (0x00..0xAF)
+    participant Storage as ConfigStorage / Flash
+
+    Note over Host, Server: Telemetry 32-Byte Burst Read (0x80..0x9F)
+    Host->>Server: Write Pointer [0x80]
+    Host->>Server: Read 32 Bytes
+    Server->>Host: ErrorFlags, Pos, Vel, Curr, VBus, Temp
+
+    Note over Host, Storage: Configuration Save (0x64)
+    Host->>Server: Write [0x64, 0x55] (CMD_SAVE_CONFIG)
+    Server->>Table: Store trigger value
+    Server->>Storage: Hook executes save_config()
+    Storage-->>Server: Ok (Flash committed)
+    Server->>Table: Self-clears 0x64 to 0
+```
+
+### Profile Features:
+
+1. **Full Range Coverage (`0x00..=0xAF`)**:
+   Exposes all EEPROM configuration parameters (`0x00..0x5F`) and volatile operational registers (`0x60..0xAF`).
+
+2. **Optimized Telemetry Burst Window (`0x80..0x9F`)**:
+   Master controllers can latch pointer `0x80` and perform a single 32-byte burst read to acquire all telemetry fields simultaneously:
+   - `0x80`: `HardwareErrorStatus` (`u16`)
+   - `0x84`: `PresentPosition` (`f32`)
+   - `0x88`: `PresentVelocity` (`f32`)
+   - `0x8C`: `PresentCurrent` (`f32`)
+   - `0x90`: `PresentBusVoltage` (`f32`)
+   - `0x94`: `PresentTemperature` (`f32`)
+
+3. **Autonomous Command Hooks**:
+   - **`SaveConfigCommand` (`0x64`)**:
+     - Writing `0x55` (`CMD_SAVE_CONFIG`): executes `storage.save_config(&table)` to commit the EEPROM block to flash.
+     - Writing `0xAA` (`CMD_FACTORY_RESET`): executes `table.load_factory_defaults()` and overwrites flash.
+     - Register automatically self-clears to `0` upon completion.
+   - **`RebootCommand` (`0x63`)**:
+     - Writing `0xF0` (`CMD_REBOOT_BOOTLOADER`): triggers the `BootloaderHandoff` state machine to disarm PWM and reset into Katapult recovery.
+
+### Rust Usage Example:
+
+```rust,no_run
+use barefoc_multibus::control_table_profile::control_table_profile;
+use barefoc_multibus::transport::RegServer;
+use barefoc::control_table::ControlTable;
+
+struct AppContext {
+    table: ControlTable,
+}
+
+let ctx = AppContext {
+    table: ControlTable::new(),
+};
+
+// Create a RegMap bound to the unified Control Table
+let map = control_table_profile::<AppContext>();
+let mut server = RegServer::new_with_context(map, ctx);
+```

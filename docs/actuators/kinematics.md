@@ -497,3 +497,97 @@ let restored = FlashCalibrationData::deserialize_from_block(&block)
 // 5. Apply restored topology and kinematics directly to the actuator assembly
 assembly.load_from_flash(&restored);
 ```
+
+---
+
+## 6. Motion Trajectory Generation (`TrapezoidalTrajectory`)
+
+The `barefoc::kinematics::trajectory::TrapezoidalTrajectory` struct computes smooth, continuous position and velocity setpoints on every discrete control step $dt$, adhering to programmed acceleration and velocity ceilings:
+
+```mermaid
+flowchart LR
+    Goal["Goal Target<br/>θ_target"] --> Traj["TrapezoidalTrajectory::update(dt)<br/>d_brake = v² / (2 · a_max)"]
+    Traj --> Commanded["Commanded State<br/>(θ_cmd, v_cmd)"]
+    Commanded --> PID["Cascaded Outer PID Loop"]
+```
+
+### Mathematical Formulation:
+
+- **Braking Distance to Target**:
+  $$d_{\text{brake}} = \frac{v^2}{2 a_{\max}}$$
+
+- **Cruising Velocity Limit**:
+  $$|v| \le v_{\max}$$
+
+- **State Transition Logic**:
+  $$\Delta\theta = \theta_{\text{target}} - \theta_{\text{current}}$$
+  $$\text{If } |\Delta\theta| \le d_{\text{brake}} \implies \text{Decelerate: } v \gets v - \text{sgn}(v) \cdot a_{\max} \cdot dt$$
+  $$\text{Else if } |v| < v_{\max} \implies \text{Accelerate: } v \gets v + \text{sgn}(\Delta\theta) \cdot a_{\max} \cdot dt$$
+  $$\theta \gets \theta + v \cdot dt$$
+
+### Rust Usage Example:
+
+```rust,no_run
+use barefoc::kinematics::trajectory::TrapezoidalTrajectory;
+
+// Configure profile limits: 20 rad/s max velocity, 50 rad/s² max acceleration
+let mut trajectory = TrapezoidalTrajectory::new(20.0, 50.0);
+trajectory.set_target(10.0); // Command 10.0 radians travel
+
+let dt = 0.001; // 1 kHz loop period
+loop {
+    let (cmd_pos, cmd_vel) = trajectory.update(dt);
+    motor.move_motor(cmd_pos);
+
+    if trajectory.is_finished() {
+        break;
+    }
+}
+```
+
+---
+
+## 7. Multi-Turn Continuous Tracking (`MultiTurnAccumulator`)
+
+Magnetic and optical rotary encoders measure angular positions within a single mechanical revolution $[-\pi, +\pi]$ or $[0, 2\pi)$. The `barefoc::kinematics::trajectory::MultiTurnAccumulator` tracks continuous multi-turn rotations across phase wrap boundaries.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Tracking
+    Tracking --> PositiveWrap: Δθ < -π (CW crossing)
+    PositiveWrap --> Tracking: rev += 1
+    Tracking --> NegativeWrap: Δθ > +π (CCW crossing)
+    NegativeWrap --> Tracking: rev -= 1
+```
+
+### Mathematical Phase Unwrapping:
+
+Given sequential raw sensor readings $\theta_k$ and $\theta_{k-1}$:
+
+$$\Delta\theta = \theta_k - \theta_{k-1}$$
+
+- If $\Delta\theta < -\pi$, a forward boundary crossing occurred:
+  $$\text{rev} \gets \text{rev} + 1$$
+- If $\Delta\theta > +\pi$, a reverse boundary crossing occurred:
+  $$\text{rev} \gets \text{rev} - 1$$
+
+The cumulative continuous output shaft angle is:
+
+$$\theta_{\text{continuous}} = 2\pi \cdot \text{rev} + \theta_k$$
+
+### Rust Usage Example:
+
+```rust,no_run
+use barefoc::kinematics::trajectory::MultiTurnAccumulator;
+
+let mut tracker = MultiTurnAccumulator::new();
+
+// In 1 kHz sensor feedback task:
+let raw_sensor_angle = sensor.get_angle(); // Single-turn [-pi, +pi]
+let unwrapped_angle = tracker.update(raw_sensor_angle);
+let full_revolutions = tracker.revolutions();
+
+table.set_present_position(unwrapped_angle);
+table.write_i32(REG_MULTI_TURN_REVOLUTIONS, full_revolutions);
+table.write_f32(REG_MULTI_TURN_ANGLE, unwrapped_angle);
+```

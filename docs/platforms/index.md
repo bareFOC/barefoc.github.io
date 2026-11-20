@@ -23,5 +23,8 @@ BareFOC maintains portable core algorithms by delegating silicon-specific periph
 3. [**CH32 RISC-V Bridge (`barefoc-ch32`)**](/platforms/ch32/):
    Targets WCH RISC-V microcontrollers (CH32V307) using `ch32-hal`. Complementary PWM generation, hardware dead-time, and system timer monotonic clocks.
 
-4. [**Bootloader Soft-Reset (`barefoc::boot`)**](/platforms/bootloader/):
-   Coordinating soft-resets into Katapult or BareBoot bootloaders using SRAM mailbox cookies without physical reset buttons.
+4. [**Bootloader Soft-Reset (`barefoc::traits::bootloader`)**](/platforms/bootloader/):
+   Coordinating safe PWM disarm and soft-resets into Katapult or BareBoot bootloaders using dynamic SRAM mailbox tokens.
+
+5. [**Flash Configuration Persistence (`barefoc::traits::storage`)**](/platforms/flash_storage/):
+   Power-loss-resilient dual-sector ping-pong Flash storage with sequence tracking and IEEE 802.3 CRC32 data integrity verification.

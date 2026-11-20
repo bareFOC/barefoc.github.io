@@ -152,3 +152,50 @@ Output formatting across both motor and kinematics commands can be adjusted via 
 - **`Minimal`**: Returns only raw numeric values (ideal for embedded microcontrollers and lightweight parsers).
 - **`UserFriendly`**: Returns descriptive labels and engineering units (e.g., `Kinematics| Mode: Two2Dof, J0 target: 1.570 rad`).
 - **`MachineReadable`**: Formatted key-value pairs (`K:KM=1`, `K:KT0=1.570`) for host plotting tools and telemetry loggers.
+
+---
+
+## 5. Smart Servo Console Interface (`SmartServoCommander`)
+
+For actuators configured with the unified `ControlTable`, `barefoc-commander` provides `SmartServoCommander`. It parses high-level servo operations, multi-motor setpoints, kinematics presets, tuning gains, and bootloader triggers over ASCII streams:
+
+### Command Grammar Reference:
+
+| Command Pattern | Action | Example | Description |
+|---|---|---|---|
+| `M<id> C <mode>` | Operating mode switch | `M0 C 2` | Switches motor 0 to Position mode (0–7) |
+| `M<id> T <val>` | Target setpoint | `M0 T 3.14` | Sets goal position / velocity setpoint |
+| `K M <preset>` | Topology preset | `K M 0` | Sets kinematics preset (`0`=4x1DOF, `1`=2x2DOF) |
+| `K T <joint> <val>` | Kinematic joint target | `K T 0 1.57` | Commands outer joint position |
+| `P <gain>` | Position loop gain | `P 25.0` | Writes to `PositionPGain` register (`0x34`) |
+| `V <gain>` | Velocity loop gain | `V 0.5` | Writes to `VelocityPGain` register (`0x40`) |
+| `SAVE` | Flash commit | `SAVE` | Triggers `SaveConfigCommand` to commit EEPROM to flash |
+| `RELOAD` | Flash reload | `RELOAD` | Reloads non-volatile settings from flash |
+| `FACTORY` | Factory reset | `FACTORY` | Restores default parameters and overwrites flash |
+| `DIAG` | Status query | `DIAG` | Returns present voltage, current, temperature, and errors |
+| `!BOOT` | Bootloader jump | `!BOOT` | Writes mailbox cookie and reboots into Katapult |
+
+---
+
+## 6. Lightweight Table-Free Float Parser
+
+Standard Rust `core::str::FromStr` for floating-point values pulls in the `core::num::dec2flt` module, which contains a **10.4 KiB** lookup table (`POWER_OF_FIVE_128`). In resource-constrained microcontrollers with strict 104 KiB application flash limits, this table consumes ~10% of total flash storage.
+
+`barefoc-commander` includes a table-free, `#![no_std]` ASCII float parser (`barefoc_commander::parse_f32`):
+
+```rust,no_run
+use barefoc_commander::parse_f32;
+
+// Parses sign, integer digits, and fractional digits with 64-bit mantissa scaling
+let value: f32 = parse_f32("-12.345").expect("Valid float");
+assert_eq!(value, -12.345);
+```
+
+### Flash Footprint Comparison:
+
+| Parser Implementation | Flash Overhead | Dec2Flt Table | Standard Compliance |
+|---|:---:|:---:|---|
+| Standard `core::str::FromStr` | $\approx 14.8\ \text{KiB}$ | Included ($10.4\ \text{KiB}$) | IEEE 754 full accuracy |
+| `barefoc_commander::parse_f32` | $\approx 380\ \text{bytes}$ | **Zero ($0\ \text{bytes}$)** | 64-bit mantissa scaled to `f32` |
+
+By replacing `FromStr` with `parse_f32`, applications reclaim over **14 KiB** of flash storage with identical setpoint accuracy.

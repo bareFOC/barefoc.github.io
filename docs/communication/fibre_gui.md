@@ -172,3 +172,29 @@ pub fn run_fibre_assembly<IO: Read + Write>(io: &mut IO, assembly: &mut Actuator
     }
 }
 ```
+
+---
+
+## 5. Smart Servo Fibre Schema & RPCs (`barefoc-fibre::servo`)
+
+For actuators using the unified 176-byte `ControlTable`, `barefoc-fibre::servo` provides `create_smart_servo_schema()` and `create_smart_servo_endpoints()`.
+
+This schema exposes:
+- **`eeprom` Object**: `node_id`, `operating_mode`, `current_limit`, `velocity_limit`, `position_p`, `velocity_p`, `current_p`.
+- **`ram` Object**: `torque_enable`, `goal_position`, `goal_velocity`, `goal_current`, `present_position`, `present_velocity`, `present_current`, `present_voltage`, `present_temp`, `hardware_error_status`.
+- **RPC Functions**:
+  - `save_configuration()`: Commits active EEPROM settings to on-chip Flash storage.
+  - `reboot_bootloader()`: Hands off execution to the Katapult bootloader for over-the-air firmware update.
+
+```rust,no_run
+use barefoc_fibre::servo::{create_smart_servo_schema, create_smart_servo_endpoints, SmartServoFibreContext};
+use barefoc_fibre::{Endpoint0Handler, FibreServer};
+use barefoc::control_table::ControlTable;
+
+let mut table = ControlTable::new();
+let endpoints = create_smart_servo_endpoints();
+let schema = create_smart_servo_schema();
+let schema_handler = Endpoint0Handler::new(schema.as_str());
+
+let mut server = FibreServer::new(&endpoints, schema_handler);
+```
