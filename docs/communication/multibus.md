@@ -260,3 +260,47 @@ let ctx = AppContext {
 let map = control_table_profile::<AppContext>();
 let mut server = RegServer::new_with_context(map, ctx);
 ```
+
+---
+
+## 5. Multi-ID Routing & Streaming Servo Protocol
+
+In multi-joint robotics (such as coupled differential wrists or multi-DOF manipulators), multiple joint channels and the composite supervisor board share a single serial bus (RS485, UART, or CAN). `barefoc-multibus` provides multi-ID dispatch and zero-allocation frame parsing to eliminate inter-axis communication skew:
+
+### Multi-ID Router (`MultiIdRouter`)
+
+```rust
+use barefoc_multibus::{MultiIdRouter, RouteTarget};
+
+// Board node ID 0x40, Joint 0 -> 1, Joint 1 -> 2
+let router = MultiIdRouter::new(0x40, [1, 2, 3, 4]);
+
+assert_eq!(router.resolve(0xFE), RouteTarget::Broadcast);
+assert_eq!(router.resolve(0x40), RouteTarget::Board);
+assert_eq!(router.resolve(1), RouteTarget::Joint(0));
+assert_eq!(router.resolve(2), RouteTarget::Joint(1));
+assert_eq!(router.resolve(99), RouteTarget::Ignore);
+```
+
+### Streaming Zero-Allocation Parser & Atomic `SYNC_WRITE`
+
+The `StreamingServoParser` ingests incoming bytes one by one without dynamic memory allocation, parsing Dynamixel Protocol 1.0, Feetech STS, and Dynamixel Protocol 2.0 frames.
+
+When a `SYNC_WRITE` (`0x83`) frame arrives on the bus, `parse_sync_write_setpoints` or `apply_sync_write_to_assembly` resolves all targeting joints and applies position setpoints directly to `ActuatorAssembly` in a single atomic pass, eliminating phase delay across coupled kinematic axes:
+
+```rust
+use barefoc_multibus::{StreamingServoParser, MultiIdRouter, apply_sync_write_to_assembly};
+use barefoc::kinematics::ActuatorAssembly;
+
+let router = MultiIdRouter::new(0x40, [1, 2, 3, 4]);
+let mut assembly = ActuatorAssembly::<4, 4>::new();
+let mut parser = StreamingServoParser::<128>::new();
+
+// In serial RX byte loop:
+if let Some(packet) = parser.parse_byte(rx_byte) {
+    if packet.instruction == barefoc_multibus::INST_SYNC_WRITE {
+        apply_sync_write_to_assembly(&packet, &router, &mut assembly);
+    }
+}
+```
+

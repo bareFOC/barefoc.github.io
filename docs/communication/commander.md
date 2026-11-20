@@ -163,6 +163,11 @@ For actuators configured with the unified `ControlTable`, `barefoc-commander` pr
 
 | Command Pattern | Action | Example | Description |
 |---|---|---|---|
+| `BOARD UID` | Hardware UID query | `BOARD UID` | Returns canonical 24-character uppercase hexadecimal silicon UID |
+| `BOARD NAME [str]` | Board name query / set | `BOARD NAME arm_wrist` | Queries or updates board name (up to 15 characters) |
+| `BOARD ID [0-127]` | Board node ID query / set | `BOARD ID 42` | Queries or updates device bus node ID (`REG_NODE_ID`) |
+| `JOINT <idx> ADDR [0-127]` | Joint address query / set | `JOINT 0 ADDR 5` | Queries or updates individual joint servo address (0–127) |
+| `JOINT <idx> NAME [str]` | Joint name query / set | `JOINT 0 NAME wrist_pitch` | Queries or updates joint name (up to 15 characters) |
 | `M<id> C <mode>` | Operating mode switch | `M0 C 2` | Switches motor 0 to Position mode (0–7) |
 | `M<id> T <val>` | Target setpoint | `M0 T 3.14` | Sets goal position / velocity setpoint |
 | `K M <preset>` | Topology preset | `K M 0` | Sets kinematics preset (`0`=4x1DOF, `1`=2x2DOF) |
