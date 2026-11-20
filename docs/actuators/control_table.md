@@ -275,3 +275,70 @@ The `HardwareErrorStatus` register (`0x140`) is evaluated on every control cycle
 | `1 << 5` | `VELOCITY_LIMIT`| Velocity $> V_{\text{limit}}$ | Saturates command to $V_{\text{limit}}$ |
 | `1 << 6` | `DRIVER_FAULT` | Hardware gate driver error flag | Latches error; requires manual re-arm |
 | `1 << 7` | `FLASH_CORRUPT` | Flash CRC32 header verification failed | Reverts parameters to factory defaults |
+
+---
+
+## 6. Runtime Calibration, Cold-Boot Hydration & Safety Protocol
+
+BareFOC implements a "Flash Once and Forget" runtime calibration pipeline that decouples compile-time constants from runtime hardware characteristics, ensuring safety on cold boot and allowing single-command calibration over serial bus protocols.
+
+### A. Cold-Boot Hydration & Fast Boot Flow
+
+On system startup before `init_foc()` is executed, the motor configuration is hydrated from the active `ControlTable`:
+
+```mermaid
+flowchart TD
+    BOOT["Cold Boot / Power On"] --> LOAD["Load EEPROM from Flash<br/>ConfigStorage::load_config()"]
+    LOAD --> HYDRATE["motor.hydrate_from_control_table(table, axis)"]
+    HYDRATE --> CHECK{"Is Calibrated?<br/>(!zero_angle.is_nan() &&<br/>zero_angle != 0.0 && dir != 0)"}
+    
+    CHECK -->|Yes| FASTBOOT["Silent Fast Boot<br/>Skip open-loop voltage search<br/>Set motor_status = MotorStatus::Ready<br/>Arm PWM outputs"]
+    CHECK -->|No| SAFE_DISARM["Safe Disarm<br/>Keep PWM outputs disabled<br/>Set motor_status = MotorStatus::DisarmedSafe<br/>Await explicit ALIGN"]
+```
+
+```rust,no_run
+use barefoc::control_table::ControlTable;
+use barefoc::motor::bldc::BLDCMotor;
+use barefoc::motor::enums::FOCMotorStatus;
+
+// 1. Hydrate from ControlTable
+motor.hydrate_from_control_table(&table, 0);
+
+// 2. Initialize FOC commutation
+let status = motor.init_foc(&clock);
+if status == 1 {
+    // Calibrated: ready for closed-loop control immediately
+    assert_eq!(motor.config.motor_status, FOCMotorStatus::Ready);
+} else {
+    // Uncalibrated: outputs disarmed safely, waiting for ALIGN
+    assert_eq!(motor.config.motor_status, FOCMotorStatus::DisarmedSafe);
+}
+```
+
+### B. MultiBus Register `0xB0` (`CALIB_CMD`)
+
+The MultiBus protocol profile registers `REG_CALIB_CMD` (`0xB0`) with self-clearing command semantics:
+
+| Command Byte | Constant | Description | Action |
+|:---:|---|---|---|
+| `0x01` | `CMD_CALIB_ALIGN` | Electrical Zero Alignment | Runs electrical alignment sweep, updates zero angle and direction in `ControlTable`, auto-commits to Flash, and transitions to `Ready`. |
+| `0x02` | `CMD_CALIB_SWEEP` | Step Sweep | Executes step-response motor sweep test. |
+| `0x03` | `CMD_CALIB_SAVE` | Manual Flash Save | Commits active EEPROM configuration to Flash storage immediately. |
+| `0x04` | `CMD_CALIB_SET_ORIGIN` | Set Mechanical Origin | Records current shaft angle as `HomingOffset` in `ControlTable` and auto-commits to Flash. |
+
+### C. Smart Servo Commander Calibration Commands
+
+The ASCII console commander exposes matching calibration triggers:
+
+- `ALIGN` or `M<id> ALIGN`: Triggers electrical zero search on the specified motor (or joint 0 if omitted), synchronizes measured zero angle and direction to `ControlTable`, and commits to non-volatile Flash.
+- `ZERO` or `M<id> ZERO`: Sets the current shaft angle as the mechanical origin offset and commits to Flash.
+
+```text
+>> M0 ALIGN
+ALIGN OK
+>> M0 ZERO
+ZERO OK
+>> SAVE
+CONFIG SAVED
+```
+
