@@ -30,4 +30,4 @@ BareFOC supports multiple electromagnetic actuator topologies through unified mo
    Mechanical transmission modeling, gear reduction ratios, leadscrews, 1-DOF / 2-DOF joint kinematics, and mechanical backlash compensation.
 
 6. [**Universal Control Table (`barefoc::control_table`)**](/actuators/control_table/):
-   Standardized 176-byte Dynamixel-grade register map, EEPROM/RAM partitioning, 8 operating modes, and hardware fault protection.
+   Standardized 256-byte Dynamixel-grade register map with Board and Joint Identity, EEPROM/RAM partitioning, 8 operating modes, and hardware fault protection.
