@@ -34,3 +34,9 @@ Available across all ESP32 variants:
 Directly drives the ESP32 PCNT (Pulse Counter) unit:
 - Glitch filters remove mechanical contact bounce and electrical noise.
 - Low-power, interrupt-free pulse counting up to tens of megahertz.
+
+---
+
+## 4. Hardware Silicon Identifier (`Esp32Uid`)
+
+Retrieves the 48-bit factory base MAC address from eFuse, implementing `barefoc::traits::HardwareUid` with zero-allocation canonical hex formatting and trailing zero padding to 12 bytes.

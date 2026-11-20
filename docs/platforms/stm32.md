@@ -79,3 +79,9 @@ Configures the STM32G4's internal rail-to-rail operational amplifiers in Program
 ## 4. High-Resolution Clock (`DwtClock`)
 
 Implements the `barefoc::traits::Clock` trait using the ARM Cortex-M Data Watchpoint and Trace (DWT) cycle counter, delivering sub-microsecond timing accuracy for PID loop $\Delta t$ calculations.
+
+---
+
+## 5. Hardware Electronic Signature (`Stm32Uid`)
+
+Provides access to the 96-bit unique factory electronic signature via `embassy_stm32::uid::uid()`, implementing `barefoc::traits::HardwareUid` with zero-allocation canonical uppercase hex formatting for bus node identity and control table serialization.

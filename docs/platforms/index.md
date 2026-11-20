@@ -28,3 +28,6 @@ BareFOC maintains portable core algorithms by delegating silicon-specific periph
 
 5. [**Flash Configuration Persistence (`barefoc::traits::storage`)**](/platforms/flash_storage/):
    Power-loss-resilient dual-sector ping-pong Flash storage with sequence tracking and IEEE 802.3 CRC32 data integrity verification.
+
+6. [**Hardware Unique ID (`barefoc::traits::uid`)**](/platforms/hardware_uid/):
+   Factory silicon electronic serial number abstractions across STM32, RP2040/RP2350, ESP32, and CH32 with zero-heap canonical hex formatting.
