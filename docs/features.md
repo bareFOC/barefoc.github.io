@@ -78,6 +78,12 @@ flowchart TD
 11. **SEGGER RTT Stream Transport (`barefoc-rtt`)**:
     A convenience stream adapter implementing `embedded-io` over SWD debug probe RTT channels, enabling console logging and Commander CLI interaction without dedicating hardware UART pins.
 
+12. **Guided Motor Calibration State Machine (`CalibrationStateMachine`)**:
+    A non-blocking, multi-stage calibration engine operating under safe low-voltage clamps (`CALIBRATION_VOLTAGE`, register `0x24`, default 1.5 V). It guides electrical zero alignment, phase direction discovery, and pole pair verification without violent jerks, persisting calibration to non-volatile flash to enable silent fast boot (< 1 ms) on future power cycles.
+
+13. **Declarative Application Macro (`barefoc_app!`)**:
+    A concise macro reducing board initialization boilerplate from >1,000 lines to under 25 lines of declarative Rust, wiring driver PWM pins, sensor buses, static Embassy async tasks (20 kHz FOC loop, 1 kHz comms), and unified transport bridges into the shared Universal Control Table.
+
 ---
 
 ## 2. Upstream Parity Overview

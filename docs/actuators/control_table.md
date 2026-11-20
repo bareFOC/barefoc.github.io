@@ -72,7 +72,10 @@ flowchart TD
 | `0x02` | `FirmwareVersion` | `u8` | RO | `0x01` | – | Application firmware release version |
 | `0x03` | `ProtocolVersion` | `u8` | RO | `0x02` | – | Supported communication protocol revision |
 | `0x04` | `HardwareUid` | `[u8; 12]`| RO | Factory | – | 96-bit silicon unique electronic signature |
-| `0x10` | `BoardNodeId` | `u8` | R/W | `0x40` | – | Primary bus device address (I2C/CAN node ID) |
+| `0x06` | `NodeId` | `u8` | R/W | `0x40` | – | Device bus target address (`NODE_ID`) |
+| `0x0B` | `CmdRebootBootloader` | `u8` | R/W | `0x00` | – | Writing `0x01` sets mailbox token `0x5984E3FA6CA1589B` & triggers BareBoot reset |
+| `0x0C` | `CmdRunCalibration` | `u8` | R/W | `0x00` | – | Writing `0x01` initiates guided non-blocking calibration state machine |
+| `0x10` | `BoardNodeId` | `u8` | R/W | `0x40` | – | Primary bus device address alias (`REG_BOARD_NODE_ID`) |
 | `0x11` | `BoardName` | `str (15B)`| R/W | `""` | – | User-configurable board node name (null-padded UTF-8) |
 
 #### 2. Joint Identity Slots (`0x20` – `0x5F`)
@@ -81,10 +84,13 @@ flowchart TD
 |:---:|---|---|:---:|:---:|:---:|---|
 | `0x20` | `Joint0Addr` | `u8` | R/W | `0` | – | Joint 0 servo communication address (0..127) |
 | `0x21` | `Joint0Name` | `str (15B)`| R/W | `""` | – | Joint 0 kinematic name (null-padded UTF-8) |
+| `0x24` | `CalibrationVoltage` | `f32` | R/W | `1.5` | V | Safety voltage clamp during electrical alignment (`CALIBRATION_VOLTAGE`) |
+| `0x25` | `CalibrationValid` | `u8` | R/W | `0` | – | Status flag (`0x01` once calibrated and locked) |
 | `0x30` | `Joint1Addr` | `u8` | R/W | `1` | – | Joint 1 servo communication address (0..127) |
 | `0x31` | `Joint1Name` | `str (15B)`| R/W | `""` | – | Joint 1 kinematic name (null-padded UTF-8) |
 | `0x40` | `Joint2Addr` | `u8` | R/W | `2` | – | Joint 2 servo communication address (0..127) |
 | `0x41` | `Joint2Name` | `str (15B)`| R/W | `""` | – | Joint 2 kinematic name (null-padded UTF-8) |
+| `0x48` | `KpVelocity` | `f32` | R/W | `0.5` | – | Velocity loop proportional gain Kp (takes effect next control cycle) |
 | `0x50` | `Joint3Addr` | `u8` | R/W | `3` | – | Joint 3 servo communication address (0..127) |
 | `0x51` | `Joint3Name` | `str (15B)`| R/W | `""` | – | Joint 3 kinematic name (null-padded UTF-8) |
 
@@ -341,4 +347,63 @@ ZERO OK
 >> SAVE
 CONFIG SAVED
 ```
+
+---
+
+## 5. Guided Calibration State Machine (`CalibrationStateMachine`)
+
+To eliminate violent startup jerks and current spikes, BareFOC introduces the guided `CalibrationStateMachine` operating under software low-voltage clamps (`CALIBRATION_VOLTAGE`, register `0x24`, default 1.5 V):
+
+```mermaid
+flowchart TD
+    IDLE["1. Idle<br/>Triggered via Register 0x0C CMD_RUN_CALIBRATION"] --> CLAMP["Apply Low-Voltage Safe Clamp<br/>CALIBRATION_VOLTAGE (0x24)"]
+    CLAMP --> ALIGN["2. AlignPhaseA<br/>Hold stator at 0 rad electrical<br/>Measure baseline sensor angle"]
+    ALIGN --> STEP["3. StepCw<br/>Step 1.0 rad forward<br/>Verify movement & determine CW/CCW direction"]
+    STEP --> DETECT["4. DetectPolePairs<br/>Rotate through electrical cycle<br/>Verify pole pairs & compute zero angle"]
+    DETECT --> SAVE["5. SaveAndLock<br/>Write zero angle & direction to ControlTable<br/>Set CALIBRATION_VALID = 0x01<br/>Commit to Flash via ConfigStorage"]
+    SAVE --> COMPLETE["6. Complete<br/>Motor transitions to Ready<br/>Silent boot (< 1 ms) enabled on future boots"]
+```
+
+### Key Safety Guarantees
+
+- **Low-Voltage Safe Clamp (`CALIBRATION_VOLTAGE`, 0x24)**: The alignment torque is strictly bounded by software voltage limits (typically 1.5 V, or 10-15% of bus voltage), preventing overcurrent trips and mechanical strain on gearboxes.
+- **Movement Threshold Verification**: If the rotor is mechanically stalled or locked, the state machine aborts with `CalibrationError::MovementTooSmall` and keeps the inverter in safe high-Z standby.
+- **Silent Fast Boot (< 1 ms)**: Once calibrated, `CALIBRATION_VALID` is stored in non-volatile flash. On subsequent power cycles, `motor.hydrate_from_control_table()` loads offsets instantly, enabling immediate closed-loop operation without rotor wiggles or movement.
+
+---
+
+## 6. Declarative Application Macro (`barefoc_app!`) & Unified Transport Bridge
+
+The `barefoc_app!` macro and `UnifiedTransportBridge` reduce board setup boilerplate from over 1,000 lines of manual Embassy code to under 25 lines of clean, declarative Rust.
+
+```rust,no_run
+use barefoc::barefoc_app;
+
+barefoc_app! {
+    driver: {
+        type: BLDCDriver3PWM,
+        pins: [PA8, PA9, PA10],
+        voltage_limit: 12.0,
+    },
+    sensor: {
+        type: MagneticSensorSPI,
+        bus: SPI1,
+    },
+    transports: {
+        multibus: { address: 0x40 },
+        commander: { enabled: true },
+    },
+    foc_frequency: 20_000,
+    comms_frequency: 1_000,
+}
+```
+
+### Unified Transport Bridge
+
+All active communication transports (MultiBus, Fibre, Commander, RTT) route register reads and writes to the single shared 256-byte `ControlTable`:
+
+- **Dynamic Gain Tuning**: Writing a 4-byte float to Register `0x48` (`KP_VELOCITY`) takes effect immediately on the next 20 kHz control cycle without restarting the inverter.
+- **Hands-Free Bootloader Entry**: Writing `0x01` to Register `0x0B` (`CMD_REBOOT_BOOTLOADER`) disarms PWM, writes the cross-reset SRAM cookie (`0x5984E3FA6CA1589B`), and executes warm reset into BareBoot.
+- **Autonomous Flash Persistence**: Writing `0x55` to Register `0x64` / `0x124` (`REG_SAVE_CONFIG_CMD`) commits the non-volatile EEPROM section to flash.
+
 
