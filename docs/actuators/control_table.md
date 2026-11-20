@@ -115,11 +115,24 @@ Each motor slot implements an identical internal layout relative to its slot bas
 | `+0x0A` | `REG_MOTORx_KV_RATING` | `f32` | R/W | `0.0` | $\text{rpm/V}$ | Motor velocity constant rating |
 | `+0x0E` | `REG_MOTORx_ZERO_ELECTRIC_ANGLE` | `f32` | R/W | `NaN` | rad | Zero electrical angle offset $\theta_{e,0}$ |
 | `+0x12` | `REG_MOTORx_SENSOR_DIRECTION` | `u8` | R/W | `0` (Unknown) | – | Sensor rotation direction (`0`=Unknown, `1`=CW, `2`=CCW) |
-| `+0x13` | `REG_MOTORx_SENSOR_TYPE` | `u8` | R/W | `0` | – | Hardware sensor peripheral type code |
+| `+0x13` | `REG_MOTORx_SENSOR_TYPE` | `u8` | R/W | `0` | – | Hardware sensor peripheral type code (see Sensor Type Selection Matrix below) |
 | `+0x14` | `REG_MOTORx_VOLTAGE_ALIGN` | `f32` | R/W | `3.0` | V | D-axis alignment test voltage |
 | `+0x18` | `REG_MOTORx_HOMING_OFFSET` | `f32` | R/W | `0.0` | rad | Mechanical zero reference offset |
 | `+0x1C` | `REG_MOTORx_CURRENT_OFFSET_A` | `f32` | R/W | `0.0` | A | Phase A current shunt analog offset |
 | `+0x20` | `REG_MOTORx_CURRENT_OFFSET_B` | `f32` | R/W | `0.0` | A | Phase B current shunt analog offset |
+
+#### Sensor Type Selection Matrix (`REG_MOTORx_SENSOR_TYPE`)
+
+Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically selects the position feedback source without requiring firmware recompilation:
+
+- `0` (`DefaultOnboard`): Board BSP default interface auto-detected from available bus.
+- `1` (`As5600`): AMS AS5600 12-bit magnetic sensor over I2C (address `0x36`).
+- `2` (`As5048b`): AMS AS5048B 14-bit magnetic sensor over I2C (address `0x40`).
+- `3` (`Mt6701`): MagnTek MT6701 14-bit magnetic sensor over SPI/SSI (Mode 0).
+- `4` (`As5047p`): AMS AS5047P / MA730 14-bit magnetic sensor over SPI (Mode 1).
+- `5` (`EncoderQei`): Hardware timer quadrature encoder interface (QEI).
+- `6` (`Hall`): 3-phase digital Hall effect position sensors.
+- `7` (`Virtual`): Virtual dummy sensor for open-loop diagnostic sweeps.
 
 ---
 

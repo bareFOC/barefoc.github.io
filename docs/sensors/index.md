@@ -25,3 +25,6 @@ Field Oriented Control requires continuous knowledge of rotor position to mainta
 
 4. [**Hall Effect Sensors**](/sensors/hall_sensors/):
    Digital 3-Hall commutation sensors and modern 3D Hall-effect flux sensors (`tmag-rs` with the TI TMAG5273).
+
+5. [**AnySensor Dynamic Dispatch**](/sensors/any_sensor/):
+   Zero-heap `AnySensor` enum dispatcher allowing runtime selection between I2C, SPI, QEI encoder, Hall, and virtual sensors driven by `ControlTable`'s `REG_MOTORx_SENSOR_TYPE`.
