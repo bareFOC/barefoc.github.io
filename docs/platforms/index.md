@@ -1,7 +1,7 @@
 ---
 layout: default
 title: "Platform Hardware Bridges"
-nav_order: 10
+nav_order: 11
 has_children: true
 permalink: /platforms/
 ---

@@ -12,6 +12,8 @@ BareFOC is a `#![no_std]` Rust implementation of Field Oriented Control (FOC) al
 
 The project is ported directly from and semantically aligned with [Arduino SimpleFOC](https://simplefoc.com), preserving its modular architecture and mathematical rigor while taking full advantage of Rust's compile-time memory safety, trait abstraction, and async execution models (such as Embassy and RTIC).
 
+For a comprehensive feature breakdown, SimpleFOC parity matrix, and BareFOC-exclusive quality-of-life additions, refer to [Features & Parity](/features/).
+
 ---
 
 ## Architectural Principles
