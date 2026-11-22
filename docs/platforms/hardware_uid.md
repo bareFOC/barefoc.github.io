@@ -34,6 +34,17 @@ pub trait HardwareUid {
     /// Executes completely on the stack without heap allocation, returning
     /// the number of ASCII characters written (2 * uid_len()).
     fn format_hex(&self, out: &mut [u8; CANONICAL_HEX_LEN]) -> usize;
+
+    /// Derive 6-byte Katapult CAN UUID using FastHash64 with seed 0xA16231A7.
+    ///
+    /// Matches Katapult CAN discovery format (flashtool.py -u <uuid>).
+    fn katapult_uuid(&self) -> [u8; 6];
+
+    /// Derive 48-bit MIPI I3C Provisional ID.
+    ///
+    /// Format: vendor ID [47:33], vendor-fixed flag [32], model ID [31:16],
+    /// instance ID [15:12], and lower silicon UID bits [11:0].
+    fn i3c_provisional_id(&self, vendor_id: u16, model_id: u16, instance_id: u8) -> [u8; 6];
 }
 ```
 
@@ -45,6 +56,26 @@ The default implementation of `format_hex` formats bytes directly into caller-pr
 let mut hex_buf = [0u8; CANONICAL_HEX_LEN];
 let char_count = uid.format_hex(&mut hex_buf);
 let hex_str = core::str::from_utf8(&hex_buf[..char_count]).unwrap();
+```
+
+---
+
+## 2. Katapult CAN UUID & MIPI I3C Provisional ID Derivation
+
+### Katapult CAN UUID
+To integrate seamlessly with Katapult flashtool on multidrop CAN networks without manual UUID configuration, `katapult_uuid()` computes a 64-bit FastHash with Katapult seed `0xA16231A7` over the valid silicon UID bytes:
+
+```rust
+let uuid = uid.katapult_uuid();
+// Returns 6 bytes matching flashtool discovery
+```
+
+### MIPI I3C Provisional ID
+During Dynamic Address Assignment (ENTDAA) on MIPI I3C busses, nodes publish a 48-bit Provisional ID. The `i3c_provisional_id()` method produces this identifier deterministically:
+
+```rust
+let prov_id = uid.i3c_provisional_id(0x0114, 0x0001, 0x02);
+// Returns 6 bytes: [vendor_id, vendor_fixed_flag, model_id, instance_id, uid_bits]
 ```
 
 ---

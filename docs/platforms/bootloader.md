@@ -30,18 +30,45 @@ sequenceDiagram
     Host->>App: Hand-off trigger (!BOOT, 0x123, RPC, CAN 0x7F)
     App->>Inverter: Disarm PWM into high-Z Coast mode
     App->>App: Disable global interrupts (cortex_m::interrupt::disable)
-    App->>SRAM: Write REQUEST_BOOTLOADER (0x5984_E3FA_6CA1_589B)
+    App->>SRAM: Write SoftResetMailbox (magic, dynamic_node_id, bus_type, crc32) to 0x2000_7FE0
     App->>App: Execute SCB::sys_reset()
     Note over App, Boot: System Reset Occurs
-    Boot->>SRAM: Inspect mailbox at _stack_end
-    SRAM-->>Boot: Token verified (0x5984_E3FA_6CA1_589B)
+    Boot->>SRAM: Inspect SoftResetMailbox at 0x2000_7FE0 & verify CRC32
+    SRAM-->>Boot: Valid mailbox found: preserve active dynamic node ID
     Boot->>Boot: Invalidate token (set to 0)
-    Boot->>Host: Enter permanent USB / I2C / CAN flashing mode
+    Boot->>Host: Enter permanent USB / I2C / I3C / CAN flashing mode at dynamic node ID
 ```
 
 ---
 
-## 2. Dynamic Mailbox Derivation
+## 2. Dynamic Mailbox Architecture (`SoftResetMailbox`)
+
+In multidrop networks (I3C, I2C, CAN), nodes dynamically assigned an address (e.g. `0x42`) must retain that address when rebooting into the bootloader to prevent bus collisions or requiring NOR flash erases.
+
+The system uses `SoftResetMailbox` placed at uninitialized SRAM (`0x2000_7FE0..0x2000_8000` on STM32H503):
+
+```rust
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SoftResetMailbox {
+    pub magic: u64,           // 0x5984_E3FA_6CA1_589B
+    pub dynamic_node_id: u8,   // Active dynamic bus address
+    pub bus_type: u8,          // Comms bus (1=I2C, 2=I3C, 3=CAN, 4=UART)
+    pub flags: u16,            // Reserved
+    pub can_assigned_id: u32,  // CAN dynamic arbitration ID
+    pub reserved: [u32; 3],    // Alignment padding
+    pub crc32: u32,            // IEEE 802.3 CRC32 over bytes 0..28
+}
+```
+
+### Warm Reboot Validation Flow
+1. **Application**: Prior to reset, writes `SoftResetMailbox` with `dynamic_node_id` and CRC32 to `0x2000_7FE0`.
+2. **Bootloader**: Checks `0x2000_7FE0`. If `magic` matches and CRC32 is valid, BareBoot binds immediately to `dynamic_node_id` with zero flash wear.
+3. **Fallback**: If uninitialized or corrupted, the bootloader falls back to persistent flash storage (Sector 14/15) or deterministic UID hash addressing.
+
+---
+
+## 3. Dynamic Vector Table Derivation (Katapult Compatibility)
 
 Rather than hard-coding static SRAM addresses (which change across chip variants and memory configurations), `Stm32H5Bootloader` calculates the SRAM mailbox address dynamically from the initial stack pointer defined in the hardware vector table:
 
