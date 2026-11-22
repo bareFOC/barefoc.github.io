@@ -255,4 +255,5 @@ fingerprinting. No test requires real hardware.
 
 - [Universal Control Table](/actuators/control_table/)
 - [MultiBus register transport](/communication/multibus/)
+- [Copper Bridge (`cu-barefoc`)](/communication/copper_bridge/)
 - [Flash Once and Play architecture](/actuators/flash_once_play/)

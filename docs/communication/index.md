@@ -47,6 +47,7 @@ flowchart TD
 | **Multibus** | `barefoc-multibus` | I2C / SPI / I3C | Memory-mapped register table (16-bit registers) | Minimum | Deterministic multi-axis servo bus control |
 | **CAN Bus** | `barefoc::communication::can` | CAN 2.0A/B / CAN-FD | 8-byte deterministic binary frames | Ultra-low | High-rate real-time motion control in multi-node robotics |
 | **SEGGER RTT** | `barefoc-rtt` | SWD / JTAG debug probe | Ring-buffer memory bridge | Near zero (< 1 µs) | Real-time debugging without consuming UART pins |
+| **Copper Bridge** | `cu-barefoc` | Serial / I2C / CAN-FD frames | Fixed-capacity reflectable joint messages | One sync frame per cycle | Copper task graphs controlling BareFOC actuator networks |
 
 1. [**Commander Protocol**](/communication/commander/):
    The ASCII command-line parser implementing the SimpleFOC `commands.h` grammar and Dynamixel-grade smart servo commands.
@@ -62,3 +63,6 @@ flowchart TD
 
 5. [**SEGGER RTT Transport**](/communication/rtt/):
    Zero-overhead bidirectional byte-stream transport over SWD debug probes implementing `embedded-io`.
+
+6. [**Copper Bridge**](/communication/copper_bridge/):
+   `CuBridge` connecting Copper task graphs to BareFOC actuator networks with atomic synchronous dispatch, cached telemetry and fail-safe disarm.
