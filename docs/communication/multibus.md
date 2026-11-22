@@ -304,3 +304,13 @@ if let Some(packet) = parser.parse_byte(rx_byte) {
 }
 ```
 
+---
+
+## 5. MultiBus to Control Table Synchronization & Flash Persistence
+
+In the [Flash Once and Play Architecture](/actuators/flash_once_play/), live parameter modifications written to `SHARED_QUAD` via MultiBus (such as PID gains `AngPidP`, velocity limits `VelocityLimit`, voltage limits `VoltageLimit`, and homing offsets) are continuously synchronized into `SHARED_CONTROL_TABLE`.
+
+### Flash Persistence Trigger (`0x64`)
+When an external host controller issues command `0x55` to register `0x64` (`SaveConfigCommand`), the runtime table synchronizer commits the entire synchronized Control Table state into non-volatile Flash Bank 2 ping-pong Sectors 14 & 15. The register self-clears upon completion, guaranteeing that user tuning parameters persist across subsequent power cycles.
+
+

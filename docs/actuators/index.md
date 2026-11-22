@@ -31,3 +31,6 @@ BareFOC supports multiple electromagnetic actuator topologies through unified mo
 
 6. [**Universal Control Table (`barefoc::control_table`)**](/actuators/control_table/):
    Standardized 384-byte Dynamixel-grade register map with Board Identity, 4-Joint Slots, Linear 4-Axis Motor Bank, EEPROM/RAM partitioning, 8 operating modes, and hardware fault protection.
+
+7. [**Flash Once and Play Architecture**](/actuators/flash_once_play/):
+   Autonomous multi-tier address binding, cold boot setpoint hydration (zero startup jerk), MultiBus-to-NVM parameter persistence, and 2 ms overcurrent emergency stall protection.
