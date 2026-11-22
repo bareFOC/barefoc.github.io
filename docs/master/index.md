@@ -13,7 +13,7 @@ buses. It intentionally depends only on `embedded-hal` 1.0, `embedded-io`, and
 `heapless`, so a main MCU (STM32H7, RP2350, ESP32) or Linux companion computer
 does not need to link motor commutation math, ADC drivers, or gate-driver code.
 
-The crate speaks the target firmware's canonical 384-byte control table
+The crate speaks the target firmware's canonical 512-byte control table
 described in [Universal Control Table](/actuators/control_table/) and the servo
 instruction set implemented by [MultiBus](/communication/multibus/).
 
@@ -32,7 +32,7 @@ flowchart LR
     I2C["I2cTransport&lt;I&gt;<br/>2-byte BE pointer"]
     STR["StreamTransport&lt;R, W&gt;<br/>framed packet + checksum"]
     BUS(["I2C / I3C / CAN / UART multidrop bus"])
-    NODE["BareFOC actuator nodes<br/>384-byte control table"]
+    NODE["BareFOC actuator nodes<br/>512-byte control table"]
 
     APP --> PROXY --> CTC --> TR
     APP --> SYNC --> TR
@@ -78,15 +78,27 @@ allocates. `unsafe_code` is forbidden by workspace lint inheritance.
 | `0x134` | `REG_GOAL_VELOCITY` | `f32` | Velocity setpoint |
 | `0x138` | `REG_GOAL_CURRENT` | `f32` | Torque / current setpoint |
 | `0x13C` | `REG_GOAL_VOLTAGE` | `f32` | Voltage setpoint |
-| `0x140` | `REG_HARDWARE_ERROR_STATUS` | `u16` | Fault bitfield read |
+| `0x140` | `REG_HARDWARE_ERROR_STATUS` | `u16` | Legacy 16-bit fault bitfield read (unchanged) |
 | `0x144` | `REG_PRESENT_POSITION` | `f32` | Telemetry |
 | `0x148` | `REG_PRESENT_VELOCITY` | `f32` | Telemetry |
 | `0x14C` | `REG_PRESENT_CURRENT` | `f32` | Telemetry |
 | `0x16C` | `REG_JOINT_TARGET_BASE` | `f32` | Base of extended slot array (slot `i` = base + `i*4`) |
 | `0x170`–`0x178` | joint 1..3 targets | `f32` | Extended angle targets for joints 1, 2, 3 |
+| `0x184` | `REG_PRESENT_BUS_POWER` | `f32` | Extended power telemetry |
+| `0x1AC` | `REG_GOAL_TORQUE_FF` | `f32` | Torque feedforward setpoint |
+| `0x1C0` | `REG_WATCHDOG_TIMEOUT_MS` | `u16` | Watchdog keepalive / timeout |
+| `0x1D8` | `REG_HARDWARE_ERROR_STATUS_EXT` | `u32` | Extended 32-bit fault flags (bits 16..20) |
+| `0x1E0` | `REG_TOTAL_REVOLUTIONS` | `f64` | Lifetime odometer |
+| `0x1F8` | `REG_HARDWARE_CAPABILITIES` | `u32` | Capability discovery; `0x1FC..0x1FF` reserved |
 
-`CONTROL_TABLE_SIZE` is `384` (`0x180`). Every bulk access is checked against
-this bound and returns a dedicated `BoundsError::OutOfBounds`.
+`CONTROL_TABLE_SIZE` is `512` (`0x200`): EEPROM `0x00..0xDF` (224 bytes) and RAM
+`0xE0..0x1FF` (288 bytes). Every bulk access is checked against this bound and
+returns a dedicated `BoundsError::OutOfBounds`. The client adds `read_u32` /
+`write_u32` and `read_f64` / `write_f64` for the capability, extended-error and
+odometer channels; all other offsets and semantics from the 384-byte map are
+unchanged. The capability mask at `0x1F8` does not overlap the 15-byte
+`BoardName` field, so a full-length board name cannot corrupt hardware
+detection.
 
 `TopologyPreset` discriminants are preserved verbatim from firmware:
 `Independent4x1Dof = 0`, `Differential2x2Dof = 1`, `Hybrid1Dof2Dof = 2`,
@@ -136,12 +148,21 @@ Both adapters are unit tested on the host with `embedded-hal-mock`.
 ### 4.1 `ControlTableClient`
 
 ```rust
-use barefoc_master::{ControlTableClient, REG_MODEL_NUMBER, REG_PRESENT_POSITION};
+use barefoc_master::{
+    ControlTableClient, CAP_DUAL_ENCODER, REG_HARDWARE_CAPABILITIES, REG_MODEL_NUMBER,
+    REG_PRESENT_BUS_POWER, REG_PRESENT_POSITION,
+};
 
 let mut client = ControlTableClient::new(0x40, i2c_transport);
 let model: u16 = client.read_u16(REG_MODEL_NUMBER)?;
 let angle: f32 = client.read_f32(REG_PRESENT_POSITION)?;
 client.write_u8(0xE0, 2)?; // Position mode
+
+// Capability discovery at 0x1F8 (u32, read-only on the node).
+let caps = client.read_u32(REG_HARDWARE_CAPABILITIES)?;
+if caps & CAP_DUAL_ENCODER != 0 {
+    let power: f32 = client.read_f32(REG_PRESENT_BUS_POWER)?;
+}
 ```
 
 ### 4.2 `FishyServoNode`

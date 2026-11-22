@@ -28,3 +28,6 @@ Field Oriented Control requires continuous knowledge of rotor position to mainta
 
 5. [**AnySensor Dynamic Dispatch**](/sensors/any_sensor/):
    Zero-heap `AnySensor` enum dispatcher allowing runtime selection between I2C, SPI, QEI encoder, Hall, and virtual sensors driven by `ControlTable`'s `REG_MOTORx_SENSOR_TYPE`.
+
+6. [**Multi-Zone Temperature Sensing**](/sensors/temperature/):
+   `TemperatureSensor` trait, NTC thermistor and factory-calibrated MCU drivers, the MOSFET / MCU / motor register map, per-zone fault bits, and the `TM` / `TU` / `TW` / `LT` Commander commands.

@@ -8,13 +8,13 @@ permalink: /actuators/control_table/
 
 # Universal Control Table (`barefoc::control_table`)
 
-The `barefoc::control_table` module provides a standardized 384-byte (`0x180`) register map and configuration engine for Dynamixel-grade smart servos and multi-axis actuator modules. It models high-performance industrial actuators with strict separation between non-volatile configuration parameters (EEPROM) and high-speed operational registers (RAM).
+The `barefoc::control_table` module provides a standardized 512-byte (`0x200`) register map and configuration engine for Dynamixel-grade smart servos and multi-axis actuator modules. It models high-performance industrial actuators with strict separation between non-volatile configuration parameters (EEPROM) and high-speed operational registers (RAM).
 
 ---
 
 ## 1. Memory Architecture & Partitioning
 
-The Control Table occupies a contiguous 384-byte memory block divided into two primary functional areas:
+The Control Table occupies a contiguous 512-byte memory block divided into two primary functional areas:
 
 ```mermaid
 flowchart TD
@@ -32,22 +32,26 @@ flowchart TD
         end
     end
 
-    subgraph RAM ["Volatile RAM Area (0xE0..0x17F, 160 Bytes)"]
+    subgraph RAM ["Volatile RAM Area (0xE0..0x1FF, 288 Bytes)"]
         direction TB
         MODE["Operating Configuration (0xE0..0xE3)<br/>OperatingMode • SecondaryId • TopologyPreset • CouplingMask"]
         LIMITS["Safety Ceilings & Calibration (0xE4..0x10B)<br/>HomingOffset • CurrentLimit • VelocityLimit • VoltageLimit • TempLimit"]
         GAINS["Control Loop Gains (0x10C..0x11F)<br/>Position PID • Velocity PID"]
         CTRL["Execution Controls (0x120..0x124)<br/>TorqueEnable • LedStatus • StatusReturnLevel • RebootCmd • SaveConfigCmd"]
         GOAL["Motion Profile Setpoints (0x128..0x13F)<br/>ProfileVelocity • ProfileAcceleration • GoalPosition • GoalVelocity • GoalCurrent"]
-        TELEM["Real-Time Feedback (0x140..0x15F)<br/>HardwareErrorStatus • PresentPosition • PresentVelocity • PresentCurrent • PresentBusVoltage • PresentTemperature"]
-        STATUS["Kinematic Status (0x160..0x16A)<br/>Moving • MultiTurnRevolutions • MultiTurnAngle"]
+        TELEM["Real-Time Feedback (0x140..0x15F)<br/>HardwareErrorStatus • PresentPosition • PresentVelocity • PresentCurrent • PresentBusVoltage • PresentTemperature (MOSFET alias)"]
+        STATUS["Kinematic Status (0x160..0x169)<br/>Moving • MultiTurnRevolutions • MultiTurnAngle"]
+        THERM["Multi-Zone Thermal (0x16A..0x179)<br/>PresentTempMcu • PresentTempMotor • TempLimitMcu • TempLimitMotor<br/>Reserved 0x17A..0x17F"]
+        EXT["Extended Telemetry (0x180..0x1F7)<br/>Power • Dynamics • Impedance • Diagnostics<br/>Watchdog • Profiling • Odometer • Fault FIFO"]
+        CAP["Capability Mask (0x1F8)<br/>u32 RO • 0x1FC..0x1FF reserved"]
     end
 
     FLASH[("Hardware Flash<br/>H5FlashStorage Ping-Pong")]
     BUS["Bus Interfaces<br/>MultiBus I2C • Commander ASCII • Fibre RPC • CAN"]
 
+    THERM -->|"evaluate_errors_zones()"| TELEM
     EEPROM <-->|"ConfigStorage::load_config()<br/>ConfigStorage::save_config()"| FLASH
-    BUS <-->|"Register Read/Write Window (0x00..0x17F)"| RAM
+    BUS <-->|"Register Read/Write Window (0x00..0x1FF)"| RAM
     BUS <-->|"EEPROM Configuration (0x00..0xDF)"| EEPROM
 ```
 
@@ -56,7 +60,7 @@ flowchart TD
 | Memory Area | Address Range | Size | Mutability | Persistence | Purpose |
 |---|:---:|:---:|:---:|---|---|
 | **EEPROM Area** | `0x00` – `0xDF` | 224 bytes | R/W | Stored in Flash via `ConfigStorage` | Board UID, node address, board name, 4x joint addresses/names, 4-axis motor physical calibration parameters |
-| **RAM Area** | `0xE0` – `0x17F` | 160 bytes | R/W & RO | Volatile (resets to default on boot) | Operating modes, safety limits, PID gains, torque enable, trajectory targets, real-time sensor telemetry, error flags |
+| **RAM Area** | `0xE0` – `0x1FF` | 288 bytes | R/W & RO | Volatile (resets to default on boot) | Operating modes, safety limits, PID gains, torque enable, trajectory targets, real-time sensor telemetry, error flags |
 
 ---
 
@@ -76,7 +80,7 @@ flowchart TD
 | `0x0B` | `CmdRebootBootloader` | `u8` | R/W | `0x00` | – | Writing `0x01` sets mailbox token `0x5984E3FA6CA1589B` & triggers BareBoot reset |
 | `0x0C` | `CmdRunCalibration` | `u8` | R/W | `0x00` | – | Writing `0x01` initiates guided non-blocking calibration state machine |
 | `0x10` | `BoardNodeId` | `u8` | R/W | `0x40` | – | Primary bus device address alias (`REG_BOARD_NODE_ID`) |
-| `0x11` | `BoardName` | `str (15B)`| R/W | `""` | – | User-configurable board node name (null-padded UTF-8) |
+| `0x11` | `BoardName` | `str (15B)`| R/W | `""` | – | User-configurable board node name (null-padded UTF-8, `0x11..0x1F`) |
 
 #### 2. Joint Identity Slots (`0x20` – `0x5F`)
 
@@ -136,7 +140,7 @@ Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically 
 
 ---
 
-### B. Volatile RAM Section (`0xE0` – `0x17F`)
+### B. Volatile RAM Section (`0xE0` – `0x1FF`)
 
 #### 1. Operating Configuration & Limits (`0xE0` – `0x11F`)
 
@@ -153,7 +157,7 @@ Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically 
 | `0xF4` | `MinPositionLimit` | `f32` | R/W | $-\pi$ | rad | Software travel floor |
 | `0xF8` | `MaxPositionLimit` | `f32` | R/W | $+\pi$ | rad | Software travel ceiling |
 | `0xFC` | `VoltageLimit` | `f32` | R/W | `5.0` | V | Maximum inverter bridge drive voltage |
-| `0x100` | `TemperatureLimit` | `f32` | R/W | `75.0` | °C | Thermal shutdown trip threshold |
+| `0x100` | `TemperatureLimit` | `f32` | R/W | `75.0` | °C | Thermal shutdown trip threshold; alias of `TempLimitMosfet` |
 | `0x104` | `MinBusVoltage` | `f32` | R/W | `3.0` | V | Undervoltage detection threshold |
 | `0x108` | `MaxBusVoltage` | `f32` | R/W | `7.0` | V | Overvoltage protection trip threshold |
 | `0x10C` | `PositionPGain` | `f32` | R/W | `20.0` | – | Position closed-loop proportional gain |
@@ -178,7 +182,7 @@ Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically 
 | `0x138` | `GoalCurrent` | `f32` | R/W | `0.0` | A | Target torque / current setpoint |
 | `0x13C` | `GoalVoltage` | `f32` | R/W | `0.0` | V | Target bridge voltage setpoint |
 | `0x140` | `HardwareErrorStatus` | `u16` | RO | `0` | – | Critical safety trip bitfield flags |
-| `0x142` | `PresentTemperature` | `f32` | RO | `0.0` | °C | Measured microcontroller die temperature |
+| `0x142` | `PresentTemperature` / `PresentTempMosfet` | `u16` | RO | `0` | °C | Legacy whole-degree stage channel; alias of the MOSFET zone |
 | `0x144` | `PresentPosition` | `f32` | RO | `0.0` | rad | Measured shaft angle feedback |
 | `0x148` | `PresentVelocity` | `f32` | RO | `0.0` | rad/s | Measured shaft velocity feedback |
 | `0x14C` | `PresentCurrent` | `f32` | RO | `0.0` | A | Measured motor phase current magnitude |
@@ -189,6 +193,55 @@ Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically 
 | `0x160` | `Moving` | `u8` | RO | `0` | – | Profile motion active indicator |
 | `0x162` | `MultiTurnRevolutions`| `i32` | RO | `0` | rev | Accumulated full rotations across boundaries |
 | `0x166` | `MultiTurnAngle` | `f32` | RO | `0.0` | rad | Continuous unwrapped position ($2\pi \cdot \text{rev} + \theta$) |
+| `0x16A` | `PresentTempMcu` | `f32` | RO | `NaN` | °C | MCU silicon temperature (`NaN` when unequipped) |
+| `0x16E` | `PresentTempMotor` | `f32` | RO | `NaN` | °C | Motor winding temperature (`NaN` when unequipped) |
+| `0x172` | `TempLimitMcu` | `f32` | R/W | `75.0` | °C | MCU thermal shutdown threshold |
+| `0x176` | `TempLimitMotor` | `f32` | R/W | `75.0` | °C | Motor winding thermal shutdown threshold |
+| `0x17A..0x17F` | *(reserved)* | – | – | – | – | Reserved RAM tail; see [Extended Telemetry](/actuators/telemetry/) for `0x180..0x1FF` |
+
+#### 3. Extended Telemetry & Control Tail (`0x180` – `0x1FF`)
+
+The 512-byte expansion adds the following canonical offsets. Float channels default to `f32::NAN` and integer/status channels to `0` when unequipped. Full descriptions, capability bits, extended error flags and the fault-record layout are in [Extended Telemetry & Control Registers](/actuators/telemetry/).
+
+| Offset | Register Name | Data Type | Access | Description |
+|:---:|---|---|:---:|---|
+| `0x180` | `PresentBusCurrent` | `f32` | RO | Measured DC bus current (A) |
+| `0x184` | `PresentBusPower` | `f32` | RO | Measured DC bus power (W) |
+| `0x188` | `AccumulatedEnergy` | `f32` | RO | Integrated energy (W·h) |
+| `0x18C` | `FocIqMeasured` | `f32` | RO | Measured FOC quadrature current (A) |
+| `0x190` | `FocIdMeasured` | `f32` | RO | Measured FOC direct current (A) |
+| `0x194` | `ModulationIndex` | `f32` | RO | SVPWM modulation index |
+| `0x198` | `BrakeChopperDuty` | `u8` | RO | Brake chopper duty cycle |
+| `0x19C` | `PresentTorque` | `f32` | RO | Estimated shaft torque (N·m) |
+| `0x1A0` | `PresentAcceleration` | `f32` | RO | Estimated shaft acceleration (rad/s²) |
+| `0x1A4` | `TrackingError` | `f32` | RO | Goal minus present position (rad) |
+| `0x1A8` | `GearDeflection` | `f32` | RO | Rotor/ratio minus horn angle (rad) |
+| `0x1AC` | `GoalTorqueFF` | `f32` | R/W | Inverse-dynamics torque feedforward (N·m) |
+| `0x1B0` | `ImpedanceKp` | `f32` | R/W | Virtual joint stiffness (N·m/rad) |
+| `0x1B4` | `ImpedanceKd` | `f32` | R/W | Virtual joint damping (N·m·s/rad) |
+| `0x1B8` | `MagFieldMagnitude` | `f32` | RO | Magnetic field magnitude (mT) |
+| `0x1BC` | `MagStatusFlags` | `u8` | RO | Magnetic sensor status flags |
+| `0x1BE` | `SensorCrcErrors` | `u16` | RO | Cumulative sensor CRC error count |
+| `0x1C0` | `WatchdogTimeoutMs` | `u16` | R/W | Bus-silence watchdog timeout (ms) |
+| `0x1C2` | `WatchdogTimeLeftMs` | `u16` | RO | Watchdog countdown (ms) |
+| `0x1C4` | `TrajectoryStatus` | `u8` | RO | Trajectory generator state |
+| `0x1C8` | `InPositionBand` | `f32` | RO | In-position indicator |
+| `0x1CC` | `PositionDeadband` | `f32` | R/W | Position deadband half-width (rad) |
+| `0x1D0` | `LoopTimeUs` | `u16` | RO | Latest control-loop execution time (µs) |
+| `0x1D2` | `MaxLoopJitterUs` | `u16` | RO | Maximum loop jitter (µs) |
+| `0x1D4` | `CpuLoadPct` | `u8` | RO | RTOS CPU load (%) |
+| `0x1D8` | `HardwareErrorStatusExt` | `u32` | RO | Extended flags, bits 16..20 (legacy `0x140` unchanged) |
+| `0x1DC` | `TotalOperatingHours` | `f32` | RO | Lifetime operating hours |
+| `0x1E0` | `TotalRevolutions` | `f64` | RO | Lifetime shaft revolutions |
+| `0x1E8..0x1F8` | `FaultHistory` | `4 × 4B` | RO | Bounded fault FIFO (code, zone, `u16` LE timestamp) |
+| `0x1F8` | `HardwareCapabilities` | `u32` | RO | Equipped-peripheral bitmask; 4-byte aligned, does not overlap `BoardName` |
+| `0x1FC..0x1FF` | *(reserved)* | – | – | Reserved RAM tail |
+
+The legacy 16-bit `HardwareErrorStatus` remains at `0x140`; the extended 32-bit `HardwareErrorStatusExt` is a separate shadow at `0x1D8`. See [Extended Telemetry & Control Registers](/actuators/telemetry/) for capability bits, extended flags and the fault-record layout, and [Multi-Zone Temperature Sensing](/sensors/temperature/) for the sensor drivers and zone flags.
+
+### Smart Servo Commander Queries
+
+The ASCII `SmartServoCommander` exposes the legacy thermal queries `TM` (MOSFET stage, whole degrees from `0x142`), `TU` (MCU silicon, `0x16A`) and `TW` (motor winding, `0x16E`). `LT <zone> <deg>` configures the corresponding limit (`F`/`TM` → `0x100`, `U`/`TU` → `0x172`, `M`/`W`/`TW` → `0x176`). Unequipped zones report `NAN`. The extended telemetry queries `CUR`, `PWR`, `NRG`, `TRQ`, `ACC`, `MAG`, `ODOM`, `WDT`, `CPU`, `CAP` and `ERRX` are documented in [Extended Telemetry](/actuators/telemetry/).
 
 ---
 
@@ -287,13 +340,18 @@ The `HardwareErrorStatus` register (`0x140`) is evaluated on every control cycle
 | Bit Flag | Constant Name | Trip Condition | Safety Response |
 |:---:|---|---|---|
 | `1 << 0` | `OVERCURRENT` | Current $> I_{\text{limit}}$ | Disarms PWM outputs into Coast mode |
-| `1 << 1` | `OVERHEAT` | Temperature $> T_{\text{limit}}$ | Disarms PWM outputs; thermal shutdown |
+| `1 << 1` | `OVERHEAT` | Any zone temperature $> T_{\text{limit}}$ | Aggregate flag; disarms PWM outputs into Coast mode |
+| `1 << 8` | `OVERHEAT_MOSFET` | MOSFET stage $> T_{\text{limit,MOSFET}}$ | Disarms PWM outputs; sets aggregate `OVERHEAT` |
+| `1 << 9` | `OVERHEAT_MOTOR` | Winding $> T_{\text{limit,MOTOR}}$ | Disarms PWM outputs; sets aggregate `OVERHEAT` |
+| `1 << 10` | `OVERHEAT_MCU` | MCU die $> T_{\text{limit,MCU}}$ | Disarms PWM outputs; sets aggregate `OVERHEAT` |
 | `1 << 2` | `OVERVOLTAGE` | Supply voltage $> V_{\text{bus,max}}$ | Flags warning; clamps dynamic braking |
 | `1 << 3` | `UNDERVOLTAGE` | Supply voltage $< V_{\text{bus,min}}$ | Disarms PWM outputs |
 | `1 << 4` | `POSITION_LIMIT`| Target requested outside soft limits | Clamps target to $[P_{\min}, P_{\max}]$ |
 | `1 << 5` | `VELOCITY_LIMIT`| Velocity $> V_{\text{limit}}$ | Saturates command to $V_{\text{limit}}$ |
 | `1 << 6` | `DRIVER_FAULT` | Hardware gate driver error flag | Latches error; requires manual re-arm |
 | `1 << 7` | `FLASH_CORRUPT` | Flash CRC32 header verification failed | Reverts parameters to factory defaults |
+
+`evaluate_errors_zones(current, bus_voltage, ThermalReadings)` evaluates the three zones independently: each trip sets its zone bit, the aggregate bit, and clears `REG_TORQUE_ENABLE`. The legacy `evaluate_errors(current, bus_voltage, temp)` wrapper treats `temp` as the MOSFET zone. `NaN` samples from unequipped sensors never trip a limit. The status word remains 16 bits.
 
 ---
 
@@ -413,7 +471,7 @@ barefoc_app! {
 
 ### Unified Transport Bridge
 
-All active communication transports (MultiBus, Fibre, Commander, RTT) route register reads and writes to the single shared 256-byte `ControlTable`:
+All active communication transports (MultiBus, Fibre, Commander, RTT) route register reads and writes to the single shared 512-byte `ControlTable`:
 
 - **Dynamic Gain Tuning**: Writing a 4-byte float to Register `0x48` (`KP_VELOCITY`) takes effect immediately on the next 20 kHz control cycle without restarting the inverter.
 - **Hands-Free Bootloader Entry**: Writing `0x01` to Register `0x0B` (`CMD_REBOOT_BOOTLOADER`) disarms PWM, writes the cross-reset SRAM cookie (`0x5984E3FA6CA1589B`), and executes warm reset into BareBoot.

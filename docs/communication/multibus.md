@@ -196,69 +196,64 @@ loop {
 
 ## 4. Universal Control Table Profile (`control_table_profile`)
 
-For Dynamixel-grade actuators utilizing the 384-byte `ControlTable`, `barefoc-multibus` provides `control_table_profile::<C>()`. This profile maps the registered parameters, enables high-speed 32-byte burst reads, and binds hardware persistence hooks:
+For Dynamixel-grade actuators utilizing the 512-byte `ControlTable`, `barefoc-multibus` provides `control_table_profile::<C>()`. This profile maps the registered parameters, enables high-speed burst reads, and binds hardware persistence hooks. Register pointers are **two-byte big-endian addresses** (design D5 of `extended-telemetry-controls`), matching `barefoc-master::I2cTransport`; canonical offsets at `0x180+` are therefore addressable without modulo-256 aliases:
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Host as Bus Master (I2C/SPI)
     participant Server as MultiBus RegServer
-    participant Table as ControlTable (0x00..0xAF)
+    participant Table as ControlTable (0x00..0x1FF)
     participant Storage as ConfigStorage / Flash
 
-    Note over Host, Server: Telemetry 32-Byte Burst Read (0x80..0x9F)
-    Host->>Server: Write Pointer [0x80]
-    Host->>Server: Read 32 Bytes
+    Note over Host, Server: Telemetry Burst Read from canonical 0x140
+    Host->>Server: Write Pointer [0x01, 0x40] (BE)
+    Host->>Server: Read N Bytes
     Server->>Host: ErrorFlags, Pos, Vel, Curr, VBus, Temp
 
-    Note over Host, Storage: Configuration Save (0x64)
-    Host->>Server: Write [0x64, 0x55] (CMD_SAVE_CONFIG)
+    Note over Host, Storage: Configuration Save (0x124)
+    Host->>Server: Write [0x01, 0x24, 0x55] (CMD_SAVE_CONFIG)
     Server->>Table: Store trigger value
     Server->>Storage: Hook executes save_config()
     Storage-->>Server: Ok (Flash committed)
-    Server->>Table: Self-clears 0x64 to 0
+    Server->>Table: Self-clears 0x124 to 0
 ```
 
 ### Profile Features:
 
-1. **Full Range Coverage (`0x00..=0xAF`)**:
-   Exposes all EEPROM configuration parameters (`0x00..0x5F`) and volatile operational registers (`0x60..0xAF`).
+1. **Full Range Coverage (`0x00..=0x1FF`)**:
+   Exposes EEPROM configuration (`0x00..0xDF`), legacy volatile registers (`0xE0..0x179`) and the extended telemetry tail (`0x180..0x1FF`) at canonical 16-bit offsets. The MOSFET thermal channel remains the legacy alias at `0x142`.
 
-2. **Optimized Telemetry Burst Window (`0x80..0x9F`)**:
-   Master controllers can latch pointer `0x80` and perform a single 32-byte burst read to acquire all telemetry fields simultaneously:
-   - `0x80`: `HardwareErrorStatus` (`u16`)
-   - `0x84`: `PresentPosition` (`f32`)
-   - `0x88`: `PresentVelocity` (`f32`)
-   - `0x8C`: `PresentCurrent` (`f32`)
-   - `0x90`: `PresentBusVoltage` (`f32`)
-   - `0x94`: `PresentTemperature` (`f32`)
+2. **Optimized Telemetry Burst Window (`0x140..0x15F`)**:
+   Master controllers latch the two-byte big-endian pointer `[0x01, 0x40]` and perform a single 32-byte burst read:
+   - `0x140`: `HardwareErrorStatus` (`u16`)
+   - `0x142`: `PresentTemperature` / `PresentTempMosfet` (`u16`)
+   - `0x144`: `PresentPosition` (`f32`)
+   - `0x148`: `PresentVelocity` (`f32`)
+   - `0x14C`: `PresentCurrent` (`f32`)
+   - `0x154`: `PresentBusVoltage` (`f32`)
 
 3. **Autonomous Command Hooks**:
-   - **`SaveConfigCommand` (`0x64`)**:
+   - **`SaveConfigCommand` (`0x124`)**:
      - Writing `0x55` (`CMD_SAVE_CONFIG`): executes `storage.save_config(&table)` to commit the EEPROM block to flash.
      - Writing `0xAA` (`CMD_FACTORY_RESET`): executes `table.load_factory_defaults()` and overwrites flash.
      - Register automatically self-clears to `0` upon completion.
-   - **`RebootCommand` (`0x63`)**:
+   - **`RebootCommand` (`0x123`)**:
      - Writing `0xF0` (`CMD_REBOOT_BOOTLOADER`): triggers the `BootloaderHandoff` state machine to disarm PWM and reset into Katapult recovery.
 
 ### Rust Usage Example:
 
 ```rust,no_run
-use barefoc_multibus::control_table_profile::control_table_profile;
+use barefoc_multibus::{control_table_profile, ControlTableContext};
 use barefoc_multibus::transport::RegServer;
 use barefoc::control_table::ControlTable;
 
-struct AppContext {
-    table: ControlTable,
-}
+// The context owns the live Control Table and optional persistence/boot drivers.
+let ctx = ControlTableContext::new(ControlTable::new(), None::<()>, None::<()>);
 
-let ctx = AppContext {
-    table: ControlTable::new(),
-};
-
-// Create a RegMap bound to the unified Control Table
-let map = control_table_profile::<AppContext>();
-let mut server = RegServer::new_with_context(map, ctx);
+// Create a RegMap bound to the 512-byte Control Table at canonical 16-bit offsets.
+let map = control_table_profile(ctx);
+let server = RegServer::new(map);
 ```
 
 ---
@@ -310,7 +305,7 @@ if let Some(packet) = parser.parse_byte(rx_byte) {
 
 In the [Flash Once and Play Architecture](/actuators/flash_once_play/), live parameter modifications written to `SHARED_QUAD` via MultiBus (such as PID gains `AngPidP`, velocity limits `VelocityLimit`, voltage limits `VoltageLimit`, and homing offsets) are continuously synchronized into `SHARED_CONTROL_TABLE`.
 
-### Flash Persistence Trigger (`0x64`)
-When an external host controller issues command `0x55` to register `0x64` (`SaveConfigCommand`), the runtime table synchronizer commits the entire synchronized Control Table state into non-volatile Flash Bank 2 ping-pong Sectors 14 & 15. The register self-clears upon completion, guaranteeing that user tuning parameters persist across subsequent power cycles.
+### Flash Persistence Trigger (`0x124`)
+When an external host controller issues command `0x55` to register `0x124` (`SaveConfigCommand`), the runtime table synchronizer commits the entire synchronized Control Table state into non-volatile Flash Bank 2 ping-pong Sectors 14 & 15. The register self-clears upon completion, guaranteeing that user tuning parameters persist across subsequent power cycles.
 
 
