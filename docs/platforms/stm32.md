@@ -85,3 +85,13 @@ Implements the `barefoc::traits::Clock` trait using the ARM Cortex-M Data Watchp
 ## 5. Hardware Electronic Signature (`Stm32Uid`)
 
 Provides access to the 96-bit unique factory electronic signature via `embassy_stm32::uid::uid()`, implementing `barefoc::traits::HardwareUid` with zero-allocation canonical uppercase hex formatting for bus node identity and control table serialization.
+
+---
+
+## 6. ADC Pin Bridge (`Stm32AdcPin` & `Stm32AdcPinFixed`)
+
+`barefoc-stm32::adc` bridges STM32 analog inputs to the `barefoc::traits::AdcPin` trait:
+
+- **`Stm32AdcPin<P, F>`**: Combines an ADC channel pin with a closure `F: FnMut(&mut P) -> u16` for sampling. Implements `read_raw()`, `read_millivolts(vref_mv)`, and calibrated VREFINT conversions.
+- **`Stm32AdcPinFixed`**: Provides fixed-reading / buffer-driven ADC reading implementing `AdcPin`, useful when values are refreshed via background DMA buffers or dual-injected conversions.
+- **VREFINT Calibration**: Implements `vrefint_to_millivolts(raw, vrefint_raw, vrefint_cal)` utilizing ST factory calibration words (such as STM32G4 / STM32H5 VREFINT calibration at 3.3V) for accurate voltage reference correction.

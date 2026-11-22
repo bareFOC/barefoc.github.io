@@ -16,9 +16,30 @@ BareFOC extends its motion control loop architecture to brushed DC motors via th
 
 While DC motors mechanically commutate via brushes and commutator segments, closed-loop position and velocity control still require deterministic PID loops, voltage clamping, and current sensing:
 
-- **`DCDriver2PWM`**: Hardware driver interface controlling an H-bridge via two PWM channels (Forward/Reverse) or PWM + Direction.
-- **`DCMotor`**: Motion controller struct providing closed-loop velocity and angle control using standard BareFOC `PIDController` and `LowPassFilter`.
+- **`DCDriver1PWM`**: Sign-magnitude (Phase/DIR) driver interface controlling an H-bridge via a single PWM speed channel and a digital direction GPIO, with optional enable pin.
+- **`DCDriver2PWM`**: Hardware driver interface controlling an H-bridge via two complementary PWM channels.
+- **`DCMotor`**: Motion controller struct providing closed-loop velocity and angle control using standard BareFOC `PIDController` and `LowPassFilter`. When `feature = "kinematics"` is enabled, `DCMotor` implements `barefoc::kinematics::MotorControl<C>` to plug directly into cascaded actuator assemblies and multi-topology kinematics.
 - **`CurrentMirrorSense`**: Lossless current sensing using integrated current mirror outputs found in modern smart H-bridge ICs.
+
+---
+
+## 1-PWM Sign-Magnitude Driving (DCDriver1PWM)
+
+For microcontrollers with asymmetric timer pinouts or dedicated Phase/DIR motor drivers (such as DRV8874, A4950), `DCDriver1PWM` maps signed voltage demands to duty cycle and direction polarity:
+
+```rust,no_run
+use barefoc_drivers::dc::driver_1pwm::DCDriver1PWM;
+
+// Construct 1-PWM driver with PWM channel and direction GPIO
+let mut driver = DCDriver1PWM::new(pwm_ch, dir_pin, Some(enable_pin));
+driver.params_mut().voltage_power_supply = 12.0;
+driver.params_mut().voltage_limit = 12.0;
+driver.init().unwrap();
+driver.enable();
+
+// Commanded positive voltage drives forward polarity
+driver.set_pwm(6.0);
+```
 
 ---
 

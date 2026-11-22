@@ -41,6 +41,9 @@ pub enum AnySensor<
     Hall(HallSensor<C>),
     /// Virtual dummy sensor for open-loop diagnostics
     Virtual(DummySensor),
+    /// TMAG5273 3D magnetic angle sensor via I2C
+    #[cfg(feature = "tmag")]
+    Tmag5273(tmag_rs::barefoc::Tmag5273Sensor<I2C>),
     /// Safe unconfigured fallback returning 0.0 rad
     Unconfigured(SensorBase),
 }
@@ -67,6 +70,7 @@ The `ControlTable` register `REG_MOTORx_SENSOR_TYPE` (`0x13` relative to motor b
 | `5` | `EncoderQei` | Hardware Timer Quadrature Encoder | Hardware 4x decoding, timer peripheral QEI |
 | `6` | `Hall` | 3-phase digital Hall effect sensors | 3 digital GPIO inputs with EXTI interrupts |
 | `7` | `Virtual` | `DummySensor` open-loop angle source | User-settable virtual angle |
+| `8` | `Tmag5273` | TI TMAG5273 16-bit 3D magnetic sensor | I2C candidate addresses (`0x35`, `0x22`, `0x78`, `0x44`) |
 
 ---
 

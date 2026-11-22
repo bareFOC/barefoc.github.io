@@ -45,6 +45,12 @@ pub trait HardwareUid {
     /// Format: vendor ID [47:33], vendor-fixed flag [32], model ID [31:16],
     /// instance ID [15:12], and lower silicon UID bits [11:0].
     fn i3c_provisional_id(&self, vendor_id: u16, model_id: u16, instance_id: u8) -> [u8; 6];
+
+    /// Derive a deterministic bus node ID within [range_start, range_start + count).
+    ///
+    /// Uses FNV-1a 32-bit hashing over valid UID bytes to ensure uniform distribution
+    /// across the target address window. If count is 0 or 1, returns range_start.
+    fn derive_bus_node_id(&self, range_start: u8, count: u8) -> u8;
 }
 ```
 
@@ -76,6 +82,14 @@ During Dynamic Address Assignment (ENTDAA) on MIPI I3C busses, nodes publish a 4
 ```rust
 let prov_id = uid.i3c_provisional_id(0x0114, 0x0001, 0x02);
 // Returns 6 bytes: [vendor_id, vendor_fixed_flag, model_id, instance_id, uid_bits]
+```
+
+### Deterministic Bus Node ID Derivation
+When dynamically assigning node addresses across CAN, I2C, or RS485 buses without dedicated EEPROM provisioning, `derive_bus_node_id(range_start, count)` derives a stable, collision-minimized node address using FNV-1a hashing:
+
+```rust
+// Assign node ID in range [0x10, 0x30)
+let node_id = uid.derive_bus_node_id(0x10, 32);
 ```
 
 ---

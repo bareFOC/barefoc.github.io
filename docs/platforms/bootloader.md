@@ -51,13 +51,37 @@ The system uses `SoftResetMailbox` placed at uninitialized SRAM (`0x2000_7FE0..0
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SoftResetMailbox {
-    pub magic: u64,           // 0x5984_E3FA_6CA1_589B
+    pub magic: u64,           // REQUEST_BOOTLOADER, REQUEST_APP, or REQUEST_START_APP
     pub dynamic_node_id: u8,   // Active dynamic bus address
     pub bus_type: u8,          // Comms bus (1=I2C, 2=I3C, 3=CAN, 4=UART)
     pub flags: u16,            // Reserved
     pub can_assigned_id: u32,  // CAN dynamic arbitration ID
     pub reserved: [u32; 3],    // Alignment padding
     pub crc32: u32,            // IEEE 802.3 CRC32 over bytes 0..28
+}
+```
+
+### Supported Magic Tokens
+
+The mailbox supports bidirectional handoff between bootloader and application:
+
+| Token Constant | Value (Hex) | ASCII / Label | Purpose |
+|---|---|---|---|
+| `REQUEST_BOOTLOADER` | `0x5984_E3FA_6CA1_589B` | Magic Seed | Application requests entry into recovery bootloader |
+| `REQUEST_APP` | `0x4649_5348_4150_5031` | `"FISHAPP1"` | Bootloader requests execution of application firmware |
+| `REQUEST_START_APP` | `0x5354_4152_5441_5050` | `"STARTAPP"` | Alternate start-app request token |
+
+`SoftResetMailbox::is_valid()` validates that `magic` matches one of these accepted tokens and that `crc32` correctly matches the IEEE 802.3 CRC over the first 28 bytes.
+
+### Mailbox Inspection Helper
+
+```rust
+// Read mailbox from SRAM location (e.g. 0x2000_7FE0)
+if let Some(mb) = barefoc_stm32::bootloader::read_soft_reset_mailbox(0x2000_7FE0 as *const _) {
+    if mb.is_valid() {
+        let node_id = mb.dynamic_node_id;
+        // Apply dynamic node address
+    }
 }
 ```
 

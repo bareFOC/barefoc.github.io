@@ -45,9 +45,9 @@ In multi-axis robotics, multiple motor axes frequently share a single bus interf
 
 ### Memory Partitioning:
 
-- **Motor Window (`0x00..=0x6C`)**: Routes dynamically to the currently selected motor (`ctx.motors[ctx.selected]`). Commands written to target (`0x01`), velocity limits (`0x52`), or PID gains (`0x30..0x4B`) apply exclusively to the selected axis.
+- **Motor Window (`0x00..=0x6C`)**: Routes dynamically to the currently selected motor (`ctx.motors[ctx.selected]`). Commands written to target (`0x01`), velocity limits (`0x52`), or PID gains (`0x30..0x4B`) apply exclusively to the selected axis. Register `0x64` (`REG_SAVE_CONFIG`) triggers non-volatile parameter persistence across soft and hard resets when commanded (e.g. `0x55`).
 - **Motor Selector (`0x70`)**: R/W register (`MotorSelect`). Writing an index $0 \le \text{idx} < N$ switches the active motor. Out-of-bounds selector writes are rejected, leaving `selected` intact while the register bank self-clears to 0.
-- **Board & Kinematics Window (`0x71..=0xB4`)**: Global system parameters, multi-axis kinematics, analytical linkage lengths, empirical LUT tables, and calibration state machines route to global context (`ctx.motors[0]`).
+- **Board & Kinematics Window (`0x71..=0xB4`)**: Global system parameters, multi-axis kinematics, analytical linkage lengths, empirical LUT tables, and calibration state machines route to global context (`ctx.motors[0]`). Register `0x78` (`REG_TOPOLOGY_MODE`) enables dynamic switching between multi-axis joint configurations.
 
 ### State Structure:
 
