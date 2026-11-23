@@ -238,6 +238,10 @@ Positioned at the top of all sub-pages, streaming at up to 60 FPS:
 | `bareconfig_flash` | `chip_name` (string), `target_bin` (string), `preserve_nvm` (bool) | Deploys firmware via Katapult with Sector 15 calibration preservation control. |
 | `bareconfig_registers` | `node_id`, `address` (int), `length` (int), `write_bytes` (array) | Reads or writes raw byte sequences in the 384/512-byte control table. |
 | `bareconfig_config` | `path` (string), `raw_content` (string) | Validates and parses `barefoc.toml` or `bareboot.toml` declarative definitions. |
+| `bareconfig_connect` | `bridge` ("agentla" / "serial" / "i2c_tinyusb" / "can" / "sim"), `host`, `port`, `node_id`, `bus_address` | Connects to an actuator node or bridge interface (AgentLA MCP, USB serial, I2C/I3C bus address, CAN node). |
+| `bareconfig_scan_bus` | `bus` ("i2c" / "i3c" / "can" / "uart"), `start_addr`, `end_addr` | Scans the communication bus to discover bareFOC nodes, connected sensors, and bootloader state. |
+| `bareconfig_step_benchmark` | `node_id`, `step_target` (number), `mode` ("position" / "velocity"), `duration_ms` (int) | Runs automated step response benchmark, measuring rise time, settling time, overshoot percentage, and steady-state error. |
+| `bareconfig_calibrate_alignment` | `node_id`, `voltage_align` (number), `persist` (bool) | Executes electrical zero / encoder alignment routine, measuring pole pairs, zero angle offset, sensor direction, and saving to Sector 15 NVM. |
 
 ### Client Configuration Snippet
 
