@@ -18,7 +18,15 @@ layout: table_wrappers
     <div class="side-bar">
       <div class="site-header">
         <img src="{{'assets/images/logo.png' | absolute_url }}" class="logo-image" style="height:58px">
+        {% if page.url contains '/bareboot/' or page.bareboot %}
+        <a href="{{ site.url }}/bareboot/" class="site-title lh-tight head-custom">Bare<span class="head-custom-blue">BOOT</span>Docs</a>
+        {% else %}
         <a href="{{ site.url }}" class="site-title lh-tight head-custom">Bare<span class="head-custom-blue">FOC</span>Docs</a>
+        {% endif %}
+        <div class="sidebar-portal-switcher">
+          <a href="{{ site.url }}/" class="portal-pill {% unless page.url contains '/bareboot/' or page.bareboot %}active{% endunless %}">BareFOC</a>
+          <a href="{{ site.url }}/bareboot/" class="portal-pill {% if page.url contains '/bareboot/' or page.bareboot %}active{% endif %}">BareBOOT</a>
+        </div>
         <button class="menu-button fs-3 js-main-nav-trigger" data-text-toggle="Hide" type="button">Menu</button>
       </div>
        <div class="navigation main-nav js-main-nav">
@@ -27,7 +35,11 @@ layout: table_wrappers
       <footer class="site-footer">
             <ul class="nav-custom nav-custom-bottom aux-nav">
               <li class="nav-item">
+                {% if page.url contains '/bareboot/' or page.bareboot %}
+                  <a href="https://github.com/bareFOC/bareBoot" target="_blank" rel="noopener"><i class="fa fa-github fa-lg"></i> GitHub</a>
+                {% else %}
                   <a href="https://github.com/bareFOC/bareFOC" target="_blank" rel="noopener"><i class="fa fa-github fa-lg"></i> GitHub</a>
+                {% endif %}
               </li>
               <li class="nav-item">
                   <a href="https://crates.io/crates/barefoc" target="_blank" rel="noopener"><i class="fa fa-cube fa-lg"></i> Crates.io</a>
@@ -48,11 +60,25 @@ layout: table_wrappers
           </div>
           {% endif %}
             <ul class="nav-custom">
-              <li class="nav-item rm-md">
-                  <a href="{{ site.url }}" title="BareFOC documentation home"><i class="fa fa-home fa-lg"></i> <span> Home</span></a>
+              <li class="nav-item portal-switcher-wrap">
+                <div class="portal-switcher">
+                  <a href="{{ site.url }}/" class="portal-pill {% unless page.url contains '/bareboot/' or page.bareboot %}active{% endunless %}">BareFOC</a>
+                  <a href="{{ site.url }}/bareboot/" class="portal-pill {% if page.url contains '/bareboot/' or page.bareboot %}active{% endif %}">BareBOOT</a>
+                </div>
               </li>
               <li class="nav-item rm-md">
+                {% if page.url contains '/bareboot/' or page.bareboot %}
+                  <a href="{{ site.url }}/bareboot/" title="BareBoot documentation home"><i class="fa fa-home fa-lg"></i> <span> BareBoot Home</span></a>
+                {% else %}
+                  <a href="{{ site.url }}" title="BareFOC documentation home"><i class="fa fa-home fa-lg"></i> <span> Home</span></a>
+                {% endif %}
+              </li>
+              <li class="nav-item rm-md">
+                {% if page.url contains '/bareboot/' or page.bareboot %}
+                  <a href="https://github.com/bareFOC/bareBoot" target="_blank" rel="noopener"><i class="fa fa-github fa-lg"></i> <span> GitHub</span> </a>
+                {% else %}
                   <a href="https://github.com/bareFOC/bareFOC" target="_blank" rel="noopener"><i class="fa fa-github fa-lg"></i> <span> GitHub</span> </a>
+                {% endif %}
               </li>
               <li class="nav-item rm-md">
                   <a href="https://crates.io/crates/barefoc" target="_blank" rel="noopener"><i class="fa fa-cube fa-lg"></i> <span> Crates.io</span> </a>
