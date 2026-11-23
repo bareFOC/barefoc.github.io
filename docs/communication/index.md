@@ -24,6 +24,7 @@ flowchart TD
         FIB["barefoc-fibre<br/>(Packetized RPC Engine)"]
         MBUS["barefoc-multibus<br/>(Register Control Table)"]
         RTT["barefoc-rtt<br/>(Zero-Overhead SWD Stream)"]
+        PT["barefoc-passthrough<br/>(FC bus bridge over CDC)"]
     end
 
     subgraph FOC ["Core Motor State"]
@@ -34,6 +35,7 @@ flowchart TD
     GUI --> FIB --> Motor
     Master --> MBUS --> Motor
     Probe --> RTT --> Motor
+    Master --> PT --> Motor
 ```
 
 ---
@@ -48,6 +50,7 @@ flowchart TD
 | **CAN Bus** | `barefoc::communication::can` | CAN 2.0A/B / CAN-FD | 8-byte deterministic binary frames | Ultra-low | High-rate real-time motion control in multi-node robotics |
 | **SEGGER RTT** | `barefoc-rtt` | SWD / JTAG debug probe | Ring-buffer memory bridge | Near zero (< 1 µs) | Real-time debugging without consuming UART pins |
 | **Copper Bridge** | `cu-barefoc` | Serial / I2C / CAN-FD frames | Fixed-capacity reflectable joint messages | One sync frame per cycle | Copper task graphs controlling BareFOC actuator networks |
+| **Bus Passthrough** | `barefoc-passthrough` | USB CDC / USART CDC | Versioned 10-byte header + CRC-16 | 10 bytes + CRC | Reaching actuator buses through an FC's existing PC link |
 
 1. [**Commander Protocol**](/communication/commander/):
    The ASCII command-line parser implementing the SimpleFOC `commands.h` grammar and Dynamixel-grade smart servo commands.
@@ -66,3 +69,6 @@ flowchart TD
 
 6. [**Copper Bridge**](/communication/copper_bridge/):
    `CuBridge` connecting Copper task graphs to BareFOC actuator networks with atomic synchronous dispatch, cached telemetry and fail-safe disarm.
+
+7. [**Bus Passthrough**](/communication/bus_passthrough/):
+   Safety-gated transport-to-transport bridge that lets the standard master SDK reach downstream I2C/UART nodes through the flight controller's USB or USART link.

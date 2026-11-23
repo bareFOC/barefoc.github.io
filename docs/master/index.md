@@ -57,6 +57,7 @@ two-byte **big-endian** address.
 | `proxies` | `FishyServoNode<T>` and `BldcFocNode<T>` actuator proxies |
 | `sync` | `SyncGroup<T>` atomic `INST_SYNC_WRITE` frames and broadcast disarm |
 | `scanner` | `BusScanner<T>` address scan, fingerprinting, bounded inventory |
+| `passthrough` | Framed PC↔FC protocol codec, `StatusCode`, `PassthroughTransport<IO>` for reaching downstream buses through an FC ([Bus Passthrough](/communication/bus_passthrough/)) |
 
 All packet buffers are stack arrays or `heapless::Vec`; the crate never
 allocates. `unsafe_code` is forbidden by workspace lint inheritance.
@@ -255,5 +256,6 @@ fingerprinting. No test requires real hardware.
 
 - [Universal Control Table](/actuators/control_table/)
 - [MultiBus register transport](/communication/multibus/)
+- [Bus Passthrough](/communication/bus_passthrough/)
 - [Copper Bridge (`cu-barefoc`)](/communication/copper_bridge/)
 - [Flash Once and Play architecture](/actuators/flash_once_play/)
