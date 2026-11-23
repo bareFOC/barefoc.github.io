@@ -37,8 +37,10 @@ flowchart TD
 
     subgraph UI ["User Interface (craft-ui & eframe)"]
         APP["bareConfig Workbench App"]
+        HOME["Home Hub Dashboard"]
         WIZ["Beginner 5-Step Wizard"]
         STU["3-Column Advanced Studio"]
+        APP --> HOME
         APP --> WIZ
         APP --> STU
     end
@@ -49,7 +51,62 @@ flowchart TD
 
 ---
 
-## 2. Declarative BSP Specification (`barefoc.toml`)
+## 2. Modern Dual-Theme Engine (Lofi Light & Black Dark)
+
+`bareConfig` integrates a native theme engine inspired by DaisyUI's high-contrast `lofi` and pure OLED `black` palettes, mapped directly to `egui::Visuals` for instant, zero-flicker re-rendering:
+
+- **Light Mode (`lofi` palette)**:
+  - Base canvas: Pure white (`#FFFFFF`)
+  - Elevated surfaces and cards: Light gray (`#F7F7F7`)
+  - Border strokes: Crisp 1px outline (`#E5E5E5`)
+  - Typography: High-contrast pure black (`#000000`) with muted text (`#737373`)
+  - Semantic status accents: Primary (`#1F2937`), Info (`#0284C7`), Success (`#16A34A`), Warning (`#D97706`), Error (`#DC2626`).
+- **Dark Mode (`black` palette)**:
+  - Base canvas: True pitch black (`#000000`)
+  - Elevated surfaces and cards: Charcoal black (`#141414` / `#1A1A1A`)
+  - Border strokes: Subtle 1px dark stroke (`#262626` / `#333333`)
+  - Typography: Crisp light text (`#E5E7EB`) with muted text (`#9CA3AF`)
+  - Semantic status accents: Primary (`#374151`), Info (`#38BDF8`), Success (`#22C55E`), Warning (`#FBBF24`), Error (`#EF4444`).
+
+A persistent theme toggle button `[ Theme: Dark (Black) ]` / `[ Theme: Light (Lofi) ]` is located in the top navigation bar, allowing immediate live switching across all panels, widgets, and charts.
+
+---
+
+## 3. Home Hub Landing Dashboard
+
+Upon launch, `bareConfig` boots into the dedicated Home Hub dashboard (`HomeState`), designed to streamline hardware onboarding, project management, and workspace filtering.
+
+### Workspace Mode Toggle: BareFOC vs. BareBoot
+The header bar of the Home Hub features a segmented mode toggle:
+- **BareFOC Motor Mode**: Displays the complete motor tuning workbench, including 5-Step Zero-to-Spin Wizard, FOC project creation, and actuator telemetry.
+- **BareBoot Bootloader Mode**: Filters out motor-specific FOC clutter, presenting a focused workflow for standalone Katapult bootloader configuration, CAN/UART bus deployment, safe-pin verification, and firmware binary flashing.
+
+### Hero Cards
+1. **Quick Connect to Hardware**:
+   - Auto-discovers attached serial ports, Katapult devices, and CMSIS-DAP debug probes (e.g. Raspberry Pi Debugprobe, WCH-LinkE).
+   - Features 1-click `[Connect]` actions for detected devices.
+   - Provides transport selection for UART Serial, CAN Bus, I2C Bus, and local simulated actuators.
+2. **Project Creation & Shortcuts**:
+   - `[+] New BareFOC Motor Project`: Opens the creation modal with target MCU, gate driver, and magnetic sensor selections.
+   - `[+] New BareBoot Target`: Opens the Katapult bootloader creation modal with bus transport and boot window configuration.
+   - `[>] Launch 5-Step Zero-to-Spin Wizard`: Direct shortcut to guided actuator bring-up.
+
+### Saved Configurations & Projects
+Saved projects are presented in distinct, color-coded sections:
+- **BareFOC Motor Projects (Cyan Accent)**: Displays active actuator projects (e.g. `Miniata-1104-Drone`, `FishyServo-4Axis-Arm`) with target MCU, driver, motor, sensor CPR, and pole pairs. Includes `Open Studio`, `Wizard`, and `Export TOML` actions.
+- **BareBoot Bootloader Targets (Amber Accent)**: Displays standalone bootloader targets (e.g. `Voron-Toolhead-CAN`, `STM32H5-UART-Bootloader`) with bus configuration, boot window duration, and safe-pin counts. Includes `Open Bootloader` and `Export TOML` actions.
+- When filtered into **BareBoot Bootloader Mode**, the BareFOC section is hidden and BareBoot targets expand to full width.
+
+### Official Hardware Examples (1-Click Load)
+Pre-configured hardware profiles are provided for instantaneous 1-click loading:
+- **Miniata BLDC Servo**: STM32H503 + DRV8311H (3x PWM) + Dual MT6701 SSI + 21:1 Gearbox.
+- **FishyServo 4-Axis Actuator**: CH32V203 Multi-Joint + DXL2 Table.
+- **Generic Drone 2205 Motor**: STM32F4 + 3x PWM + AS5600 I2C.
+- **Gimbal 2804 High-R Motor**: STM32G4 + Low-Side Shunts + AS5048A SPI.
+
+---
+
+## 4. Declarative BSP Specification (`barefoc.toml`)
 
 `barefoc.toml` defines the silicon target, memory map, bootloader protocol, power envelopes, and gate driver topologies in a single declarative file.
 
@@ -137,7 +194,7 @@ default_baud = 250000
 
 ---
 
-## 3. OTA Preservation Contract
+## 5. OTA Preservation Contract
 
 In the Flasher panel and Makeflash pipeline, an explicit checkbox is provided:
 
@@ -148,7 +205,7 @@ In the Flasher panel and Makeflash pipeline, an explicit checkbox is provided:
 
 ---
 
-## 4. Beginner 5-Step "Zero-to-Spin" Wizard
+## 6. Beginner 5-Step "Zero-to-Spin" Wizard
 
 For new hardware bring-up, bareConfig guides users through a linear, fail-safe 5-step workflow:
 
@@ -165,7 +222,7 @@ For new hardware bring-up, bareConfig guides users through a linear, fail-safe 5
 
 ---
 
-## 5. Advanced 3-Column Studio Workbench
+## 7. Advanced 3-Column Studio Workbench
 
 Designed for high-performance motor tuning and multi-axis actuator networks:
 
@@ -188,7 +245,7 @@ Designed for high-performance motor tuning and multi-axis actuator networks:
 
 ---
 
-## 6. Building & Running
+## 8. Building & Running
 
 ### Native Desktop (Linux, macOS, Windows)
 
