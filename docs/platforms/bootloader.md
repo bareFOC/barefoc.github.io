@@ -152,9 +152,51 @@ bootloader.enter_bootloader();
 
 The bootloader hand-off can be initiated through any supported communication protocol:
 
-| Bus Interface | Invocation Syntax / Payload | Handling Module |
-|---|---|---|
-| **MultiBus I2C / SPI** | Write `0xF0` to `RebootCommand` (`0x123`) | `barefoc-multibus::control_table_profile` |
-| **Commander ASCII** | Command `!BOOT\n` | `barefoc-commander::SmartServoCommander` |
-| **Fibre RPC** | Call method `reboot_bootloader()` | `barefoc-fibre::servo` |
-| **CAN Bus** | Send frame `0x07F` with token `0x5984_E3FA_6CA1_589B` | `barefoc::communication::can` |
+| Bus Interface | Invocation Syntax / Payload | Handling Module | Context |
+|---|---|---|---|
+| **MultiBus / I2C Target** | Raw byte `0xF0` or write `0xF0` to `0x63` / `0x123` | `barefoc-multibus::strobe`, `barefoc-stm32::bus_target_i2c` | Hardware Peripheral ISR / Interrupt Executor |
+| **I3C Target** | CCC `RSTACT` (defining byte `0x02`) or raw byte `0xF0` | `barefoc-multibus::strobe`, `barefoc-stm32::bus_target_i2c` | Hardware Peripheral ISR / Interrupt Executor |
+| **Commander ASCII** | Command `!BOOT\n` or `B\n` | `barefoc-commander::SmartServoCommander` | Task Stream / Line Processor |
+| **Fibre RPC** | Call method `reboot_bootloader()` | `barefoc-fibre::servo` | RPC Endpoint Dispatcher |
+| **CAN Bus** | Admin frame `0x3F0` or frame `0x07F` with token `0x5984_E3FA_6CA1_589B` | `barefoc::communication::can` | CAN Frame Filter |
+
+---
+
+## 6. Interrupt-Level In-Band Strobe Preemption
+
+To prevent application lockout when motor control loops, busy telemetry streaming, or blocked cooperative tasks monopolize the CPU, in-band bootloader strobes are processed in hardware interrupt service routine (ISR) context rather than in cooperative tasks:
+
+- **I2C / I3C Peripheral ISR Hook**: The `i2c_isr_strobe_hook` evaluates incoming write frames directly inside the event interrupt handler or on a dedicated Embassy `InterruptExecutor` (such as TIM6 on STM32H5).
+- **Deterministic Latency**: Host strobe `0xF0` is decoded within microseconds, immediately disarming the motor driver and triggering system reset into BareBoot even if background application tasks are starved or non-yielding.
+- **Wire Safety**: Single-byte `0xF0` frames bypass application register map latching and immediately trigger warm reset, avoiding corruption of live actuator registers.
+
+---
+
+## 7. Failsafe HardFault and Panic Recovery Trampoline
+
+When an unhandled CPU exception (HardFault, divide-by-zero, memory fault) or software panic occurs during high-speed motor execution, the default `#![no_std]` behavior of spinning in an infinite loop (`loop {}`) can leave active H-bridge power FETs conducting, risking thermal runaway and motor winding damage while locking out host communication.
+
+BareFOC provides `barefoc_failsafe_recovery()` in `barefoc-stm32` as the central exception and panic recovery handler:
+
+```rust
+#[inline(never)]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    barefoc_stm32::bootloader::barefoc_failsafe_recovery();
+}
+
+#[cortex_m_rt::exception]
+unsafe fn HardFault(_ef: &cortex_m_rt::ExceptionFrame) -> ! {
+    barefoc_stm32::bootloader::barefoc_failsafe_recovery();
+}
+```
+
+### Trampoline Execution Steps:
+1. **Interrupt Masking**: Masks all interrupts (`cpsid i`) to prevent recursive faults.
+2. **PWM Timer Shutdown**: Immediately writes zero to Capture/Compare Enable Registers (TIM1 CCER, TIM3 CCER, TIM2, TIM4, TIM8, TIM20) and disables Main Output Enable (BDTR MOE = 0), forcing all half-bridge FETs off into safe high-impedance mode.
+3. **Gate Driver Low-Power Sleep**: Asserts gate driver `DRV_SLEEP` low (e.g. PB15 on STM32H503) to disable gate driver charge pumps.
+4. **Driver Disarm Hook**: Invokes any application-registered `before_reset_hook` callback.
+5. **Mailbox Preservation**: Writes the active dynamic node ID, bus type, and CRC32 into `SoftResetMailbox` at `0x2000_7FE0` and writes `REQUEST_BOOTLOADER` (`0x5984E3FA6CA1589B`) to the bootloader SRAM mailbox.
+6. **D-Cache Clean & Barriers**: Cleans D-Cache lines covering the mailboxes on Cortex-M7/M33 and executes Data Synchronization Barrier (`dsb()`) and Instruction Synchronization Barrier (`isb()`).
+7. **System Reset**: Writes `SYSRESETREQ` (`(0x05FA << 16) | (1 << 2)`) to `SCB_AIRCR`, resetting directly into BareBoot recovery mode for host inspection and reflashing.
+
