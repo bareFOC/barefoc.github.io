@@ -1,0 +1,5 @@
+{% if page.url contains '/bareboot/' or page.bareboot %}
+  {% include nav_bareboot.html %}
+{% else %}
+  {% include nav_barefoc.html %}
+{% endif %}

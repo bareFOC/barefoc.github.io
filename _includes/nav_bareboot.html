@@ -1,0 +1,39 @@
+<nav role="navigation" aria-label="BareBoot navigation">
+  {%- assign pages_list = site.html_pages | sort: "nav_order" -%}
+
+  <ul class="navigation-list">
+    <li class="navigation-list-item" data-url="{{ '/bareboot/' | relative_url }}">
+      <a href="{{ '/bareboot/' | absolute_url }}" class="navigation-list-link">Overview</a>
+    </li>
+
+    {%- for node in pages_list -%}
+      {%- if node.parent == "BareBoot" -%}
+        <li class="navigation-list-item" data-url="{{ node.url }}">
+          <a href="{{ node.url | absolute_url }}" class="navigation-list-link">{{ node.title }}</a>
+
+          {%- if node.has_children -%}
+            {%- assign children_list = pages_list | where: "parent", node.title -%}
+            <ul class="navigation-list-child-list" style="list-style-type: none; display: block;">
+              {%- for child in children_list -%}
+                <li class="navigation-list-item child-list" data-url="{{ child.url }}">
+                  <a href="{{ child.url | absolute_url }}" class="navigation-list-link">{{ child.title }}</a>
+                </li>
+              {%- endfor -%}
+            </ul>
+          {%- endif -%}
+        </li>
+      {%- endif -%}
+    {%- endfor -%}
+
+    <li class="navigation-list-item external" style="margin-top:10px">
+      BareBoot Resources
+      <ul class="navigation-list-child-list" style="list-style-type: none;">
+        <li class="navigation-list-item external">
+          <a href="https://github.com/bareFOC/bareBoot" class="navigation-list-link external" target="_blank" rel="noopener noreferrer">
+            <i class="fa fa-lg fa-github"></i> GitHub Repository
+          </a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</nav>
