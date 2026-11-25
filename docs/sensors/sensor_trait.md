@@ -93,3 +93,12 @@ flowchart LR
 | **SSI Magnetic** | MT6701, MagnTek series | Synchronous Serial | Absolute on-axis | 14-bit (16384 CPR) | $\ge 25\text{ kHz}$ |
 | **Quadrature (ABI)** | Optical / Magnetic Encoders | Timer QEI / GPIO IRQ | Relative increment | Up to 100,000 CPR | $\gt 1\text{ MHz}$ edge rate |
 | **3-Phase Hall** | Digital Hall latches (U, V, W) | GPIO IRQ / Timer capture | Commutation feedback | 60° electrical (6 CPR/elec) | Dynamic interpolation |
+
+---
+
+## Runtime Sensor & Bus Configuration
+
+`bareFOC::traits::sensor` also defines two `#![no_std]` traits for live runtime reconfiguration without tearing down hardware peripherals:
+
+- **`SensorBusControl`**: Inspects and reconfigures sensor bus clock frequency (`bus_frequency_hz`, `set_bus_frequency_hz`) and recovers stuck bus states (`recover_bus`). Implemented on STM32H5/G4 via `barefoc_stm32::Stm32I2cBusControl` (which updates `TIMINGR` with `PE=0/1` sequencing and provides `probe_max_frequency_hz`).
+- **`SensorRuntimeConfig`**: Reads and applies portable `SensorConfig` (`range`, `averaging`, `power_mode`, `crc_enabled`, `glitch_filter`) in-place via `sensor_config` and `apply_sensor_config`. Implemented by `tmag_rs::barefoc::Tmag5273Sensor` (backed by `Tmag5273::reconfigure` and per-field setters) and `mt6xxx_rs::Mt6701`.

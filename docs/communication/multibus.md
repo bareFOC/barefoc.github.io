@@ -315,6 +315,7 @@ When an external host controller issues command `0x55` to register `0x124` (`Sav
 `simplefoc_profile` and `multi_motor_profile` place every `RegisterId` on a strict 4-byte-aligned, non-overlapping `u16` byte offset via `RegisterId::aligned_offset()` / `barefoc_multibus::reg_offset(id)` inside a 640-byte `RegMap` (`160` max entries). Profile builders assert on `RegMap::add_register` so overlapping or out-of-capacity descriptors never drop silently.
 
 - **Safety & Calibration Registers Exposed**: `MinPositionLimit` (`0x57`), `MaxPositionLimit` (`0x58`), `StallTimeoutMs` (`0x59`), `HardwareErrorStatus` (`0x5A`, RO), `PresentBusVoltage` (`0x5B`, RO), `PresentTemperature` (`0x5C`, RO), `CalibCommand` (`0xB0`), `REG_SAVE_CONFIG`, and `REG_TOPOLOGY_MODE`.
+- **Runtime Sensor & Bus Registers Exposed**: `SensorBusFreqHz` (`0xB5`, `u32` R/W), `SensorRange` (`0xB6`, `u8` R/W), `SensorAveraging` (`0xB7`, `u8` R/W), `SensorCrcEnable` (`0xB8`, `u8` R/W), and `SensorFaultStatus` (`0xB9`, `u8` RO), persisted across power cycles in `ControlTable` EEPROM (`0x54..0x5A`) via `SaveConfig`.
 - **Unified `SafetySupervisor` (`bareFOC::safety`)**: Evaluates soft travel limits (pre-drive clamping), kinematic stall with startup/reversal breakaway grace (distinguishing heavy moving loads from hard-stop/gear-slip stalls), `I²t` + instantaneous overcurrent, bus-voltage derating, `OVERVOLTAGE`/`UNDERVOLTAGE`/`OVERHEAT` disarm, `DRIVER_FAULT`, `SENSOR_FAULT` (`SensorStatus`), stepper `DESYNC`, and host `COMM_TIMEOUT` watchdog in `O(1)` per 1 kHz tick.
 
 
