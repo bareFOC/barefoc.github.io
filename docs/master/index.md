@@ -51,7 +51,8 @@ two-byte **big-endian** address.
 
 | Module | Responsibility |
 |---|---|
-| `registers` | `u16` register offsets, instruction constants, `OperatingMode` / `TopologyPreset` enums |
+| `registers` | `u16` register offsets, `error_flags`, `SensorStatus`, instruction constants, `OperatingMode` / `TopologyPreset` |
+| `multibus` | `RegisterId`, `ALIGNED_OFFSETS`, `reg_offset`, and `SimpleFocClient<T>` for 4-byte-aligned SimpleFOC MultiBus profiles |
 | `transport` | `Transport` trait, `TransportError<E>`, `I2cTransport<I>`, `StreamTransport<R, W>` |
 | `client` | `ControlTableClient<T>` typed read/write and bounds validation |
 | `proxies` | `FishyServoNode<T>` and `BldcFocNode<T>` actuator proxies |
@@ -233,6 +234,23 @@ for node in nodes.iter() {
 
 Silent addresses are skipped; a responding node is fingerprinted from
 `REG_MODEL_NUMBER`, `REG_FIRMWARE_VERSION`, and the 96-bit `REG_HARDWARE_UID`.
+
+### 4.6 `SimpleFocClient` (4-byte-aligned MultiBus profile)
+
+For actuator nodes exposing `barefoc_multibus::simplefoc_profile` or `multi_motor_profile`, `SimpleFocClient<T>` resolves every `RegisterId` through `RegisterId::aligned_offset()` (`reg_offset`) instead of legacy 1-byte-spaced offsets:
+
+```rust
+use barefoc_master::{RegisterId, SimpleFocClient};
+
+let mut node = SimpleFocClient::new(0x30, i2c_transport);
+node.set_position_limits(-1.25, 1.75)?;
+node.set_stall_timeout_ms(250)?;
+node.set_control_mode(2)?;
+let faults = node.hardware_error_status()?;
+let vbus = node.present_bus_voltage()?;
+let temp_c = node.present_temperature()?;
+node.save_config()?;
+```
 
 ---
 

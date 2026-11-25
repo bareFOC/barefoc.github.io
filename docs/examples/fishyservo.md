@@ -20,10 +20,10 @@ flowchart TD
     Console["Serial Terminal / RTT"] <-->|"USART1 / Segger RTT"| Stm32
     
     subgraph stm32_peripherals ["On-Chip Peripherals"]
-        I2CTarget["TIM6 Interrupt Executor (P8) - MultiBus Server"]
+        I2CTarget["I3C2_EV/ER (P1) + TIM6 Interrupt Executor (P2) - MultiBus Server"]
         MotorTask["1 kHz Thread Executor - Kinematics & PID"]
-        AdcTask["ADC1 DMA - Low-Side Current Sense & Bus Voltage"]
-        FlashStore["H5FlashStorage - Ping-Pong Flash Sectors"]
+        AdcTask["ADC1 (ThreadModeRawMutex) - Low-Side Current Sense & Bus Voltage"]
+        FlashStore["H5FlashStorage - Ping-Pong Flash Sectors 14-15"]
     end
     
     Stm32 -->|"I2C1 Sensor Bus (PB6/PB7)"| Tmag["TI TMAG5273 3D Hall Sensor (FPC)"]
@@ -66,9 +66,9 @@ Topology presets can be switched at runtime without resetting via MultiBus regis
 
 At startup, the firmware runs `Tmag5273::discover(&mut i2c1, &CLOCK)` across candidate addresses (`0x35`, `0x22`, `0x78`, `0x44`) at both 400 kHz and 100 kHz bus speeds. Once discovered, the sensor is configured in continuous angle mode and bound to the primary closed-loop axis. If no sensor is detected on the FPC ribbon, the firmware falls back safely to open-loop voltage/velocity control.
 
-### 3. Dedicated High-Priority MultiBus Server
+### 3. Dedicated High-Priority MultiBus Server & Zero-Lockout Recovery
 
-Host communications on `I2C2` run inside an Embassy `InterruptExecutor` bound to `TIM6` with NVIC priority P8. This guarantees that host register transactions and bootloader handoff requests cannot be starved by the motor control loop.
+Host communications on `I3C2` run inside an Embassy `InterruptExecutor` bound to `TIM6` (`Priority::P2`), woken directly on `I3C2_EV`/`I3C2_ER` (`Priority::P1`) (`I3C2_EVENT_IRQ_MASK` without mid-read `TXFNFF` preemption) rather than polling delays, while `ADC1` uses `ThreadModeRawMutex` so analog conversions never mask bus interrupts. `Stm32I3cTarget::preload_read()` clamps read-prefetch lengths to the remaining map extent and arms `TGTTDR` without toggling `I3C2_CFGR.EN`, and `check_and_recover_stuck_sda()` pulses `RCC_APB3RSTR.I3C2RST` if `PB4` (`SDA`) remains low continuously for 50 ms.
 
 Supported Control Table registers include:
 
@@ -80,11 +80,13 @@ Supported Control Table registers include:
 - `0xDC`: `REG_SAVE_CONFIG` (write `0x01` to trigger `H5FlashStorage` ping-pong write).
 - `0xDE`: `REG_REBOOT_CMD` (write `0x01` for system reset, `0x02` for BareBoot/Katapult).
 
-### 4. Hands-Free Katapult / BareBoot Entry
+### 4. Hands-Free BareBoot Entry & Watchdog Hardening
 
-The firmware supports zero-touch entry into bootloader mode through two independent paths:
-1. **Single-Byte Strobe**: Sending byte `0xF0` to I2C target address `0x40` invokes `bootloader_write_hook`, which writes the soft-reset mailbox token to SRAM (`0x2000_7FE0`) and calls `SCB::sys_reset()`.
-2. **Register Command**: Writing `0x02` to register `0xDE` (`REG_REBOOT_CMD`) performs the same mailbox-guided reboot sequence.
+The firmware supports zero-touch entry into BareBoot recovery through four independent paths (`barefoc` / `bareboot` feature):
+1. **Single-Byte Strobe**: Sending byte `0xF0` to target address `0x40` invokes `bootloader_write_hook`, clears `BootLoopGuard`, writes `SoftResetMailbox` (`0x2000_7FE0`), and resets into BareBoot.
+2. **Hardware Target Reset Pattern (`EVR_RSTF`) & CCC `RSTACT`**: Driving the MIPI I3C Target Reset Pattern or `CCC RSTACT` (`0x2A`/`0x9A`/`0xAA`, defining byte `0x02`) triggers `barefoc_failsafe_recovery()`.
+3. **Register Command**: Writing `0x02` to register `0xDE` (`REG_REBOOT_CMD`) performs the same mailbox-guided reboot sequence.
+4. **Watchdog & 3-Strike BootLoopGuard**: `fishyservo_stm32h5` feeds the ~2.0 s hardware `IWDG` only while `I3C2_BUS_HEALTHY` holds (withholding `IWDG` feeds if `SDA` stays stuck low after `RCC_APB3RSTR` recovery) and clears `BootLoopGuard` (`0x2000_7FD0`) after 500 ms of healthy `I3C2` + motor execution. The bootloader slot spans 96 KB (`0x0800_2000..0x0801_A000`, `_stack_start = 0x2000_7FD0`), preserving Sector 13 (`CommitStore`) and Sectors 14–15 (`H5FlashStorage`).
 
 ---
 

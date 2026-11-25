@@ -22,13 +22,15 @@ The STM32H503 flash consists of 16 sectors of 8 KB each (`0x0800_0000` to `0x080
 +-------------------+-------------+----------------------------------------------+
 | Memory Region     | Size        | Purpose / Allocation                         |
 +-------------------+-------------+----------------------------------------------+
-| 0x08000000        | 8 KB        | Sector 0: BareBoot Bootloader (Katapult)     |
-| 0x08002000        | 104 KB      | Sectors 1–13: User Application (BareFOC)     |
+| 0x08000000        | 8 KB        | Sector 0: BareBoot Bootloader (WRP-protected)|
+| 0x08002000        | 96 KB       | Sectors 1–12: User Application (BareFOC)     |
+| 0x0801A000        | 8 KB        | Sector 13: Monotonic CommitStore + CRC32     |
 | 0x0801C000        | 8 KB        | Sector 14: Persistent Config Journal Bank A  |
 | 0x0801E000        | 8 KB        | Sector 15: Persistent Config Journal Bank B  |
 +-------------------+-------------+----------------------------------------------+
-| 0x20000000        | 32 KB - 8B  | SRAM: Application & Bootloader BSS/Data/Stack|
-| 0x20007FF8        | 8 Bytes     | Mailbox Cookie: bl_vectors[0] (0x5984E3FA...) |
+| 0x20000000        | 32 KB - 48B | SRAM: Application & Bootloader BSS/Data/Stack|
+| 0x20007FD0        | 16 Bytes    | BootLoopGuard: 3-strike CRC32 crash counter  |
+| 0x20007FE0        | 32 Bytes    | SoftResetMailbox & Legacy Cookie (0x20007FF8)|
 +-------------------+-------------+----------------------------------------------+
 ```
 
@@ -38,16 +40,18 @@ The STM32H503 flash consists of 16 sectors of 8 KB each (`0x0800_0000` to `0x080
 flowchart LR
     subgraph Flash128K ["STM32H503 Flash (128 KB)"]
         direction TB
-        S0["Sector 0 (8 KB)<br/>0x0800_0000<br/><b>BareBoot</b>"]
-        S1["Sectors 1–13 (104 KB)<br/>0x0800_2000<br/><b>User Application Slot</b>"]
+        S0["Sector 0 (8 KB)<br/>0x0800_0000<br/><b>BareBoot (WRP)</b>"]
+        S1["Sectors 1–12 (96 KB)<br/>0x0800_2000<br/><b>User Application Slot</b>"]
+        S13["Sector 13 (8 KB)<br/>0x0801_A000<br/><b>CommitStore Journal</b>"]
         S14["Sector 14 (8 KB)<br/>0x0801_C000<br/>Config Ping-Pong A"]
         S15["Sector 15 (8 KB)<br/>0x0801_E000<br/>Config Ping-Pong B"]
     end
 
     subgraph RAM32K ["SRAM (32 KB: 0x2000_0000 - 0x2000_7FFF)"]
         direction TB
-        RAM_APP["Application & Bootloader Stack / Heap"]
-        RAM_BOX["0x2000_7FF8: 64-bit Mailbox Cookie"]
+        RAM_APP["Application & Bootloader Stack / Heap (_stack_start = 0x2000_7FD0)"]
+        RAM_GUARD["0x2000_7FD0: 16-byte BootLoopGuard (CRC32)"]
+        RAM_BOX["0x2000_7FE0: 32-byte SoftResetMailbox + 0x2000_7FF8 Cookie"]
     end
 ```
 
@@ -121,9 +125,9 @@ pub unsafe fn reboot_to_bareboot() -> ! {
 
 ---
 
-## 5. Persistent Configuration Protection (Ping-Pong Storage)
+## 5. Zero-Lockout Recovery & Persistent Configuration Protection
 
-Sectors 14 and 15 (`0x0801_C000` and `0x0801_E000`) are explicitly isolated from bootloader flash erasure:
-- BareBoot flashing routines reject any `SEND_BLOCK` payload whose address falls at or above `0x0801_C000`.
-- The application stores calibration data (electrical angle offset, pole pair counts, bus node ID, PID gains) using an alternating ping-pong journal with CRC32 verification.
-- Re-flashing application firmware in Sectors 1–13 preserves calibration and node addressing across updates.
+- **Monotonic CommitStore (Sector 13, `0x0801_A000..0x0801_BFFF`)**: 16-byte alignment-generic `CommitRecord { magic, state, app_len, app_crc32 }` entries record `IN_PROGRESS` before Sector 1 erase and `VALID(app_len, app_crc32)` only upon `CMD_COMPLETE`. Boot jumps require `CommitState::Valid`, valid vector table, and full-image IEEE 802.3 CRC32 verification.
+- **IWDG & BootLoopGuard (`0x2000_7FD0..0x2000_7FDF`)**: BareBoot starts `IWDG` (~2.0 s) and increments `BootLoopGuard.attempts` before jumping to the application. The application feeds `IWDG` and clears `attempts = 0` after 500 ms of healthy execution; 3 consecutive crashes or hangs trap BareBoot permanently in I3C recovery mode.
+- **1500 ms Cold-Boot Window & Hardware WRP/BOR**: On cold boot with a valid image, BareBoot listens on `I3C2` for `1500 ms` (`ENTDAA` / `SETDASA` / `EVR_RSTF` cancels auto-boot). Sector 0 is protected via hardware flash `WRP` (`WRPSGN1R` bit 0) with `BOR` Level 3 (~2.7 V).
+- **Persistent NVM Calibration (Sectors 14–15, `0x0801_C000..0x0801_FFFF`)**: BareBoot rejects any `RX_BLOCK` write at or above `0x0801_A000`, keeping Sectors 14–15 bit-exact across all OTA and recovery cycles.

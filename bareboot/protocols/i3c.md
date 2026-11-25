@@ -30,7 +30,9 @@ Before communicating over I3C, the host controller enumerates connected targets 
 MIPI I3C standardizes chip-level reset commands through Common Command Codes, allowing hardware or controller-level reset triggers without dedicated GPIO lines:
 
 - **Broadcast CCC**: `0x2A` (`RSTACT`)
-- **Direct CCC**: `0x9A` (`RSTACT`)
+- **Direct CCC**: `0x9A` (`RSTACT`, alternate `0xAA`)
+- **Hardware Target Reset Pattern (`EVR_RSTF`)**: 14 SDA transitions while SCL is low (monitored on `I3C_EVR` bit 27). In `Stm32I3cTarget`, either `EVR_RSTF` or `CCC RSTACT` (`0x02`) triggers `barefoc_failsafe_recovery()`. In BareBoot, `EVR_RSTF` clears `BootLoopGuard`, resets RX/TX FIFO state, and parks permanently in `ENTDAA`-ready recovery mode.
+- **Stuck-`SDA` Bus-Wedge Recovery (`RCC_APB3RSTR`)**: Both BareBoot and `Stm32I3cTarget` sample `PB4` (`I3C2_SDA`) against bus event progress; if `SDA == 0` persists for 50 ms continuously, firmware pulses `RCC_APB3RSTR.I3C2RST` (bit 9) and re-initializes `I3C2`. Application `IWDG` feeding is gated on `I3C2` bus health so any unrecoverable line fault forces a ~2.0 s hardware watchdog reset.
 
 ### RSTACT Defining Byte Codes
 
