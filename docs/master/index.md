@@ -56,7 +56,8 @@ two-byte **big-endian** address.
 | `transport` | `Transport` trait, `TransportError<E>`, `I2cTransport<I>`, `StreamTransport<R, W>` |
 | `client` | `ControlTableClient<T>` typed read/write and bounds validation |
 | `proxies` | `FishyServoNode<T>` and `BldcFocNode<T>` actuator proxies |
-| `sync` | `SyncGroup<T>` atomic `INST_SYNC_WRITE` frames and broadcast disarm |
+| `sync` | `SyncGroup<T>` atomic `INST_SYNC_WRITE` / `INST_ACTION` frames and broadcast disarm |
+| `shadow` | `ShadowWriter<MAX_NODES>` opt-in `CommandBlock` write cache with mandatory watchdog heartbeat |
 | `scanner` | `BusScanner<T>` address scan, fingerprinting, bounded inventory |
 | `passthrough` | Framed PC↔FC protocol codec, `StatusCode`, `PassthroughTransport<IO>` for reaching downstream buses through an FC ([Bus Passthrough](/communication/bus_passthrough/)) |
 
@@ -72,10 +73,10 @@ allocates. `unsafe_code` is forbidden by workspace lint inheritance.
 | `0x00` | `REG_MODEL_NUMBER` | `u16` | Fingerprinting |
 | `0x02` | `REG_FIRMWARE_VERSION` | `u8` | Fingerprinting |
 | `0x04` | `REG_HARDWARE_UID` | `[u8; 12]` | 96-bit silicon UID fingerprinting |
-| `0xE0` | `REG_OPERATING_MODE` | `u8` | `BldcFocNode::set_operating_mode` (Position = `2`) |
 | `0xE2` | `REG_TOPOLOGY_PRESET` | `u8` | `FishyServoNode::set_topology_mode` |
-| `0x120` | `REG_TORQUE_ENABLE` | `u8` | Emergency broadcast disarm (write `0`) |
-| `0x124` | `REG_SAVE_CONFIG_CMD` | `u8` | NVM commit trigger (`0x55`) |
+| `0x123` | `REG_SAVE_CONFIG_CMD` | `u8` | NVM commit trigger (`0x55`) |
+| `0x12C` | `REG_TORQUE_ENABLE` / `REG_COMMAND_BLOCK` | `u8` / 16 B | Emergency broadcast disarm (write `0`); start of 16-byte `CommandBlock` |
+| `0x12D` | `REG_OPERATING_MODE` | `u8` | `BldcFocNode::set_operating_mode` (Position = `2`) |
 | `0x130` | `REG_GOAL_POSITION` | `f32` | Joint 0 / angle setpoint, sync target |
 | `0x134` | `REG_GOAL_VELOCITY` | `f32` | Velocity setpoint |
 | `0x138` | `REG_GOAL_CURRENT` | `f32` | Torque / current setpoint |
@@ -131,15 +132,20 @@ sequenceDiagram
     C-->>App: f32
 ```
 
-**I2C.** `I2cTransport<I, const MAX_FRAME: usize = 18>` stages a two-byte
-big-endian pointer plus payload in a fixed buffer, emits one write transaction,
-and latches the pointer with a write before a burst read. Oversize writes return
+**I2C.** `I2cTransport<I, const MAX_FRAME: usize = 32>` stages a two-byte
+big-endian pointer plus payload in a fixed buffer and emits one write
+transaction. Reads use `embedded_hal::i2c::I2c::write_read` for a single
+repeated-START bus transaction. Node addresses are strictly validated to 7-bit
+bounds (`node <= 0x7F`, otherwise `TransportError::InvalidAddress`), and
+`send_packet` returns `TransportError::Protocol` because raw broadcast frames
+are not supported on 7-bit I2C. Oversize writes return
 `TransportError::BufferTooSmall`; raise `MAX_FRAME` for larger bulk transfers.
 
-**Serial streams.** `StreamTransport<R, W>` frames each packet as
-`[0xA5][node][reg_hi][reg_lo][len][payload...][checksum]` with an XOR checksum.
-Reads send a zero-length request and decode a framed response; writes wait for
-a zero-length ACK. `embedded_io::Read + Write` is the only requirement.
+**Serial streams.** `StreamTransport<R, W>` (`MAX_STREAM_PAYLOAD = 256`) frames
+each packet as `[0xA5][node][reg_hi][reg_lo][len][payload...][checksum]` with
+an XOR checksum. Reads send a zero-length request and decode a framed response;
+writes wait for a zero-length ACK. `embedded_io::Read + Write` is the only
+requirement.
 
 Both adapters are unit tested on the host with `embedded-hal-mock`.
 
@@ -158,7 +164,17 @@ use barefoc_master::{
 let mut client = ControlTableClient::new(0x40, i2c_transport);
 let model: u16 = client.read_u16(REG_MODEL_NUMBER)?;
 let angle: f32 = client.read_f32(REG_PRESENT_POSITION)?;
-client.write_u8(0xE0, 2)?; // Position mode
+client.write_u8(0x12D, 2)?; // Position mode
+
+// Burst-write torque enable, mode, and position/velocity/current goals at 0x12C.
+use barefoc_master::{CommandBlock, OperatingMode};
+client.write_command_block(&CommandBlock {
+    torque_enable: true,
+    operating_mode: OperatingMode::Position,
+    goal_position: 1.5708,
+    goal_velocity: 0.0,
+    goal_current: 1.0,
+})?;
 
 // Capability discovery at 0x1F8 (u32, read-only on the node).
 let caps = client.read_u32(REG_HARDWARE_CAPABILITIES)?;
@@ -183,7 +199,7 @@ servo.set_joint_target(0, 1.5708)?;
 servo.set_joint_target(2, -0.75)?;
 let position = servo.present_position()?;
 let faults = servo.hardware_error_status()?;
-servo.save_config()?; // writes 0x55 to 0x124
+servo.save_config()?; // writes 0x55 to 0x123
 ```
 
 ### 4.3 `BldcFocNode`
@@ -213,20 +229,50 @@ use barefoc_master::{SyncGroup, REG_GOAL_POSITION};
 
 let mut group = SyncGroup::new(stream_transport);
 group.sync_write_position(&[(1, 0.35), (2, -0.35), (3, 1.20)])?;
-group.emergency_stop()?; // broadcast INST_WRITE: 0x120 = 0
+group.sync_write_velocity(&[(1, 4.0), (2, -4.0)])?;
+group.sync_write_current(&[(1, 0.8), (2, 0.8)])?;
+group.action_all()?;        // broadcast INST_ACTION (0x05)
+group.emergency_stop()?;    // broadcast INST_WRITE: 0x12C = 0
 ```
 
-Up to `MAX_NODES = 16` targets are accepted; frames are bounded by
-`MAX_PACKET_LEN = 128` bytes. The CRC is the Dynamixel v2 CRC-16 (polynomial
+Up to `MAX_NODES = 32` targets are accepted; frames are bounded by
+`MAX_PACKET_LEN = 256` bytes. Generic multi-register bursts can use
+`sync_write_block(address, data_len, &[(id, slice)])`, and single-node queued
+execution uses `action(node)`. The CRC is the Dynamixel v2 CRC-16 (polynomial
 `0x8005`), so frames parse directly in the target's `StreamingServoParser`.
 
-### 4.5 `BusScanner`
+### 4.5 `ShadowWriter` (opt-in write cache)
+
+`ShadowWriter<const MAX_NODES: usize = 32>` deduplicates identical consecutive
+`CommandBlock` writes while enforcing a mandatory non-zero
+`heartbeat_interval_ticks` (`>= 1`, clamping `0` to `1`) so target watchdogs
+are always refreshed:
+
+```rust
+use barefoc_master::{CommandBlock, OperatingMode, ShadowWriter};
+
+let mut shadow: ShadowWriter = ShadowWriter::new(10);
+let cmd = CommandBlock {
+    torque_enable: true,
+    operating_mode: OperatingMode::Position,
+    goal_position: 1.0,
+    goal_velocity: 0.0,
+    goal_current: 1.0,
+};
+let wrote = shadow.write_if_changed(0, &mut client, &cmd)?;
+```
+
+Transport errors automatically invalidate the failing node slot so the next
+tick retries; `invalidate(node_idx)` and `invalidate_all()` clear cached
+entries on mode switches, E-stops, or bus reconnects.
+
+### 4.6 `BusScanner`
 
 ```rust
 use barefoc_master::BusScanner;
 
 let mut scanner = BusScanner::new(i2c_transport);
-let nodes = scanner.scan_all_i2c()?; // 0x08..=0x77, at most MAX_NODES = 16
+let nodes = scanner.scan_all_i2c()?; // 0x08..=0x77, at most MAX_NODES = 32
 for node in nodes.iter() {
     // node.address, node.model_number, node.firmware_version, node.uid
 }
@@ -235,7 +281,7 @@ for node in nodes.iter() {
 Silent addresses are skipped; a responding node is fingerprinted from
 `REG_MODEL_NUMBER`, `REG_FIRMWARE_VERSION`, and the 96-bit `REG_HARDWARE_UID`.
 
-### 4.6 `SimpleFocClient` (4-byte-aligned MultiBus profile)
+### 4.7 `SimpleFocClient` (4-byte-aligned MultiBus profile)
 
 For actuator nodes exposing `barefoc_multibus::simplefoc_profile` or `multi_motor_profile`, `SimpleFocClient<T>` resolves every `RegisterId` through `RegisterId::aligned_offset()` (`reg_offset`) instead of legacy 1-byte-spaced offsets:
 

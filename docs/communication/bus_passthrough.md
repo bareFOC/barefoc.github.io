@@ -159,7 +159,7 @@ stateDiagram-v2
 ```
 
 1. **Entry verification** — `OP_ENTER` is rejected with `NotDisarmed` while the
-   FC is armed or any downstream `REG_TORQUE_ENABLE` (`0x120`) is nonzero.
+   FC is armed or any downstream `REG_TORQUE_ENABLE` (`0x12C`) is nonzero.
 2. **Active disarm** — on accepted entry the FC broadcasts
    `REG_TORQUE_ENABLE = 0` to every actuator bus before forwarding any frames.
 3. **Watchdog** — every valid frame (or `OP_KEEPALIVE`) refreshes a timer sourced

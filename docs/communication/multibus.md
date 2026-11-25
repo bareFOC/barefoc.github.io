@@ -211,12 +211,12 @@ sequenceDiagram
     Host->>Server: Read N Bytes
     Server->>Host: ErrorFlags, Pos, Vel, Curr, VBus, Temp
 
-    Note over Host, Storage: Configuration Save (0x124)
-    Host->>Server: Write [0x01, 0x24, 0x55] (CMD_SAVE_CONFIG)
+    Note over Host, Storage: Configuration Save (0x123)
+    Host->>Server: Write [0x01, 0x23, 0x55] (CMD_SAVE_CONFIG)
     Server->>Table: Store trigger value
     Server->>Storage: Hook executes save_config()
     Storage-->>Server: Ok (Flash committed)
-    Server->>Table: Self-clears 0x124 to 0
+    Server->>Table: Self-clears 0x123 to 0
 ```
 
 ### Profile Features:
@@ -224,21 +224,23 @@ sequenceDiagram
 1. **Full Range Coverage (`0x00..=0x1FF`)**:
    Exposes EEPROM configuration (`0x00..0xDF`), legacy volatile registers (`0xE0..0x179`) and the extended telemetry tail (`0x180..0x1FF`) at canonical 16-bit offsets. The MOSFET thermal channel remains the legacy alias at `0x142`.
 
-2. **Optimized Telemetry Burst Window (`0x140..0x15F`)**:
-   Master controllers latch the two-byte big-endian pointer `[0x01, 0x40]` and perform a single 32-byte burst read:
-   - `0x140`: `HardwareErrorStatus` (`u16`)
-   - `0x142`: `PresentTemperature` / `PresentTempMosfet` (`u16`)
-   - `0x144`: `PresentPosition` (`f32`)
-   - `0x148`: `PresentVelocity` (`f32`)
-   - `0x14C`: `PresentCurrent` (`f32`)
-   - `0x154`: `PresentBusVoltage` (`f32`)
+2. **Optimized Telemetry Burst Window (`0x140..0x15F`) & Contiguous Command Block (`0x12C..0x13F`)**:
+   - **Command Block (`0x12C..0x13F`)**: `TorqueEnable` (`0x12C`), `OperatingMode` (`0x12D`), 2-byte reserved padding (`0x12E..0x12F`), followed by 4-byte-aligned `GoalPosition` (`0x130`), `GoalVelocity` (`0x134`), `GoalCurrent` (`0x138`), and `GoalVoltage` (`0x13C`). A single 16-byte or 20-byte burst write updates the full command state in one I2C transaction.
+   - **Telemetry Burst (`0x140..0x15F`)**: Master controllers use `RegClientI2c::read_register` (combined `I2c::write_read` repeated-START with two-byte big-endian pointer `[0x01, 0x40]`) to read the telemetry block in one transaction:
+     - `0x140`: `HardwareErrorStatus` (`u16`)
+     - `0x142`: `PresentTemperature` / `PresentTempMosfet` (`u16`)
+     - `0x144`: `PresentPosition` (`f32`)
+     - `0x148`: `PresentVelocity` (`f32`)
+     - `0x14C`: `PresentCurrent` (`f32`)
+     - `0x154`: `PresentBusVoltage` (`f32`)
+   - **`RegClientI2c` Defaults**: `RegClientI2c<B, const TX_BUF: usize = 32>` stages up to 30 payload bytes per write frame out of the box (covering the 16/20-byte command block and 12-byte UID) and performs reads via `I2c::write_read`.
 
 3. **Autonomous Command Hooks**:
-   - **`SaveConfigCommand` (`0x124`)**:
+   - **`SaveConfigCommand` (`0x123`)**:
      - Writing `0x55` (`CMD_SAVE_CONFIG`): executes `storage.save_config(&table)` to commit the EEPROM block to flash.
      - Writing `0xAA` (`CMD_FACTORY_RESET`): executes `table.load_factory_defaults()` and overwrites flash.
      - Register automatically self-clears to `0` upon completion.
-   - **`RebootCommand` (`0x123`)**:
+   - **`RebootCommand` (`0x122`)**:
      - Writing `0xF0` (`CMD_REBOOT_BOOTLOADER`): triggers the `BootloaderHandoff` state machine to disarm PWM and reset into Katapult recovery.
 
 ### Rust Usage Example:
@@ -305,8 +307,8 @@ if let Some(packet) = parser.parse_byte(rx_byte) {
 
 In the [Flash Once and Play Architecture](/actuators/flash_once_play/), live parameter modifications written to `SHARED_QUAD` via MultiBus (such as PID gains `AngPidP`, velocity limits `VelocityLimit`, voltage limits `VoltageLimit`, and homing offsets) are continuously synchronized into `SHARED_CONTROL_TABLE`.
 
-### Flash Persistence Trigger (`0x124`)
-When an external host controller issues command `0x55` to register `0x124` (`SaveConfigCommand`), the runtime table synchronizer commits the entire synchronized Control Table state into non-volatile Flash Bank 2 ping-pong Sectors 14 & 15. The register self-clears upon completion, guaranteeing that user tuning parameters persist across subsequent power cycles.
+### Flash Persistence Trigger (`0x123`)
+When an external host controller issues command `0x55` to register `0x123` (`SaveConfigCommand`), the runtime table synchronizer commits the entire synchronized Control Table state into non-volatile Flash Bank 2 ping-pong Sectors 14 & 15. The register self-clears upon completion, guaranteeing that user tuning parameters persist across subsequent power cycles.
 
 ---
 

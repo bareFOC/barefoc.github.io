@@ -34,11 +34,11 @@ flowchart TD
 
     subgraph RAM ["Volatile RAM Area (0xE0..0x1FF, 288 Bytes)"]
         direction TB
-        MODE["Operating Configuration (0xE0..0xE3)<br/>OperatingMode • SecondaryId • TopologyPreset • CouplingMask"]
+        MODE["Operating Configuration (0xE0..0xE3)<br/>Reserved (0xE0) • SecondaryId • TopologyPreset • CouplingMask"]
         LIMITS["Safety Ceilings & Calibration (0xE4..0x10B)<br/>HomingOffset • CurrentLimit • VelocityLimit • VoltageLimit • TempLimit"]
         GAINS["Control Loop Gains (0x10C..0x11F)<br/>Position PID • Velocity PID"]
-        CTRL["Execution Controls (0x120..0x124)<br/>TorqueEnable • LedStatus • StatusReturnLevel • RebootCmd • SaveConfigCmd"]
-        GOAL["Motion Profile Setpoints (0x128..0x13F)<br/>ProfileVelocity • ProfileAcceleration • GoalPosition • GoalVelocity • GoalCurrent"]
+        CTRL["Execution Controls (0x120..0x12B)<br/>LedStatus • StatusReturnLevel • RebootCmd • SaveConfigCmd • ProfileVelocity • ProfileAcceleration"]
+        GOAL["Contiguous Command Block (0x12C..0x13F)<br/>TorqueEnable • OperatingMode • GoalPosition • GoalVelocity • GoalCurrent • GoalVoltage"]
         TELEM["Real-Time Feedback (0x140..0x15F)<br/>HardwareErrorStatus • PresentPosition • PresentVelocity • PresentCurrent • PresentBusVoltage • PresentTemperature (MOSFET alias)"]
         STATUS["Kinematic Status (0x160..0x169)<br/>Moving • MultiTurnRevolutions • MultiTurnAngle"]
         THERM["Multi-Zone Thermal (0x16A..0x179)<br/>PresentTempMcu • PresentTempMotor • TempLimitMcu • TempLimitMotor<br/>Reserved 0x17A..0x17F"]
@@ -146,7 +146,7 @@ Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically 
 
 | Offset | Register Name | Data Type | Access | Default | Unit | Description |
 |:---:|---|---|:---:|:---:|:---:|---|
-| `0xE0` | `OperatingMode` | `u8` | R/W | `2` (Position) | – | Active motion control regime (0–7) |
+| `0xE0` | *(reserved)* | `u8` | – | – | – | Reserved (legacy `OperatingMode` moved to `0x12D`) |
 | `0xE1` | `SecondaryId` | `u8` | R/W | `0xFD` | – | Secondary / group broadcast address |
 | `0xE2` | `TopologyPreset` | `u8` | R/W | `0` (4x 1-DOF) | – | Kinematics topology configuration mode |
 | `0xE3` | `CouplingMask` | `u8` | R/W | `0x00` | – | Differential joint coupling bitmask |
@@ -170,13 +170,15 @@ Driven by [`AnySensor`](/sensors/any_sensor/), the sensor type code dynamically 
 
 | Offset | Register Name | Data Type | Access | Default | Unit | Description |
 |:---:|---|---|:---:|:---:|:---:|---|
-| `0x120` | `TorqueEnable` | `u8` | R/W | `0` | – | Motor enable state (`0`=Coast/Disarm, `1`=Armed) |
-| `0x121` | `LedStatus` | `u8` | R/W | `0` | – | User LED indicator state |
-| `0x122` | `StatusReturnLevel` | `u8` | R/W | `2` | – | Response verbosity level |
-| `0x123` | `RebootCommand` | `u8` | WO | `0` | – | Write `0xF0` to enter Katapult bootloader |
-| `0x124` | `SaveConfigCommand` | `u8` | WO | `0` | – | Write `0x55` to save EEPROM; write `0xAA` for factory reset |
-| `0x128` | `ProfileVelocity` | `f32` | R/W | `10.0` | rad/s | Trajectory generator peak cruise velocity |
-| `0x12C` | `ProfileAcceleration` | `f32` | R/W | `25.0` | $\text{rad/s}^2$ | Trajectory generator profile acceleration |
+| `0x120` | `LedStatus` | `u8` | R/W | `0` | – | User LED indicator state |
+| `0x121` | `StatusReturnLevel` | `u8` | R/W | `2` | – | Response verbosity level |
+| `0x122` | `RebootCommand` | `u8` | WO | `0` | – | Write `0xF0` to enter Katapult bootloader |
+| `0x123` | `SaveConfigCommand` | `u8` | WO | `0` | – | Write `0x55` to save EEPROM; write `0xAA` for factory reset |
+| `0x124` | `ProfileVelocity` | `f32` | R/W | `10.0` | rad/s | Trajectory generator peak cruise velocity |
+| `0x128` | `ProfileAcceleration` | `f32` | R/W | `25.0` | $\text{rad/s}^2$ | Trajectory generator profile acceleration |
+| `0x12C` | `TorqueEnable` | `u8` | R/W | `0` | – | Motor enable state (`0`=Coast/Disarm, `1`=Armed); start of contiguous command block |
+| `0x12D` | `OperatingMode` | `u8` | R/W | `2` (Position) | – | Active motion control regime (0–7) |
+| `0x12E..0x12F` | *(reserved)* | `2B` | – | `0` | – | Command header alignment padding |
 | `0x130` | `GoalPosition` | `f32` | R/W | `0.0` | rad | Target position setpoint |
 | `0x134` | `GoalVelocity` | `f32` | R/W | `0.0` | rad/s | Target velocity setpoint |
 | `0x138` | `GoalCurrent` | `f32` | R/W | `0.0` | A | Target torque / current setpoint |
@@ -314,7 +316,7 @@ assert_eq!(assembly.joint_name(0), "pitch");
 
 ## 4. Standard Operating Modes
 
-The actuator control loop switches dynamically according to the `OperatingMode` register (`0xE0`):
+The actuator control loop switches dynamically according to the `OperatingMode` register (`0x12D`):
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -475,6 +477,6 @@ All active communication transports (MultiBus, Fibre, Commander, RTT) route regi
 
 - **Dynamic Gain Tuning**: Writing a 4-byte float to Register `0x48` (`KP_VELOCITY`) takes effect immediately on the next 20 kHz control cycle without restarting the inverter.
 - **Hands-Free Bootloader Entry**: Writing `0x01` to Register `0x0B` (`CMD_REBOOT_BOOTLOADER`) disarms PWM, writes the cross-reset SRAM cookie (`0x5984E3FA6CA1589B`), and executes warm reset into BareBoot.
-- **Autonomous Flash Persistence**: Writing `0x55` to Register `0x64` / `0x124` (`REG_SAVE_CONFIG_CMD`) commits the non-volatile EEPROM section to flash.
+- **Autonomous Flash Persistence**: Writing `0x55` to Register `0x123` (`REG_SAVE_CONFIG_CMD`) commits the non-volatile EEPROM section to flash.
 
 

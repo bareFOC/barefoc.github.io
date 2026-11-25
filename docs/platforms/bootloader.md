@@ -27,7 +27,7 @@ sequenceDiagram
     participant SRAM as SRAM Mailbox (_stack_end)
     participant Boot as Katapult Bootloader (0x0800_0000)
 
-    Host->>App: Hand-off trigger (!BOOT, 0x123, RPC, CAN 0x7F)
+    Host->>App: Hand-off trigger (!BOOT, 0x122, RPC, CAN 0x7F)
     App->>Inverter: Disarm PWM into high-Z Coast mode
     App->>App: Disable global interrupts (cortex_m::interrupt::disable)
     App->>SRAM: Write SoftResetMailbox (magic, dynamic_node_id, bus_type, crc32) to 0x2000_7FE0
@@ -154,7 +154,7 @@ The bootloader hand-off can be initiated through any supported communication pro
 
 | Bus Interface | Invocation Syntax / Payload | Handling Module | Context |
 |---|---|---|---|
-| **MultiBus / I2C Target** | Raw byte `0xF0` or write `0xF0` to `0x63` / `0x123` | `barefoc-multibus::strobe`, `barefoc-stm32::bus_target_i2c` | Hardware Peripheral ISR / Interrupt Executor |
+| **MultiBus / I2C Target** | Raw byte `0xF0` or write `0xF0` to `0x63` / `0x122` | `barefoc-multibus::strobe`, `barefoc-stm32::bus_target_i2c` | Hardware Peripheral ISR / Interrupt Executor |
 | **I3C Target** | CCC `RSTACT` (defining byte `0x02`) or raw byte `0xF0` | `barefoc-multibus::strobe`, `barefoc-stm32::bus_target_i2c` | Hardware Peripheral ISR / Interrupt Executor |
 | **Commander ASCII** | Command `!BOOT\n` or `B\n` | `barefoc-commander::SmartServoCommander` | Task Stream / Line Processor |
 | **Fibre RPC** | Call method `reboot_bootloader()` | `barefoc-fibre::servo` | RPC Endpoint Dispatcher |
