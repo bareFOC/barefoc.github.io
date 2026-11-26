@@ -20,7 +20,7 @@ flowchart TD
     Console["Serial Terminal / RTT"] <-->|"USART1 / Segger RTT"| Stm32
     
     subgraph stm32_peripherals ["On-Chip Peripherals"]
-        I2CTarget["I3C2_EV/ER (P1) + TIM6 Interrupt Executor (P2) - MultiBus Server"]
+        I2CTarget["I3C2_EV/ER ISR (P1) + TIM6 Housekeeping (P2) - MultiBus Server"]
         MotorTask["1 kHz Thread Executor - Kinematics & PID"]
         AdcTask["ADC1 (ThreadModeRawMutex) - Low-Side Current Sense & Bus Voltage"]
         FlashStore["H5FlashStorage - Ping-Pong Flash Sectors 14-15"]
@@ -66,9 +66,11 @@ Topology presets can be switched at runtime without resetting via MultiBus regis
 
 At startup, the firmware runs `Tmag5273::discover(&mut i2c1, &CLOCK)` across candidate addresses (`0x35`, `0x22`, `0x78`, `0x44`) at both 400 kHz and 100 kHz bus speeds. Once discovered, the sensor is configured in continuous angle mode and bound to the primary closed-loop axis. If no sensor is detected on the FPC ribbon, the firmware falls back safely to open-loop voltage/velocity control.
 
-### 3. Dedicated High-Priority MultiBus Server & Zero-Lockout Recovery
+### 3. ISR-Driven MultiBus Server & Zero-Lockout Recovery
 
-Host communications on `I3C2` run inside an Embassy `InterruptExecutor` bound to `TIM6` (`Priority::P2`), woken directly on `I3C2_EV`/`I3C2_ER` (`Priority::P1`) (`I3C2_EVENT_IRQ_MASK` without mid-read `TXFNFF` preemption) rather than polling delays, while `ADC1` uses `ThreadModeRawMutex` so analog conversions never mask bus interrupts. `Stm32I3cTarget::preload_read()` clamps read-prefetch lengths to the remaining map extent, skips `CFGR_TXFLUSH` when `EVR_TXFEF` is already set, and arms `TGTTDR` without toggling `I3C2_CFGR.EN`. After telemetry updates in `i3c_target_task`, `Stm32I3cTarget::refresh_read_buffer()` refreshes the preloaded TX FIFO whenever the frame is idle (`is_frame_idle()` and no pending `RXFNEF`/`FCF`), and `check_and_recover_stuck_sda()` pulses `RCC_APB3RSTR.I3C2RST` if `PB4` (`SDA`) remains low continuously for 50 ms.
+Host communications on `I3C2` are serviced directly inside the `I3C2_EV` and `I3C2_ER` interrupt handlers (`Priority::P1`) via `Stm32I3cTarget::service_once()`, eliminating `TIM6` task-switch latency on back-to-back `W [reg] -> R [data]` transactions under `1 kHz` closed-loop load. On `WritePhase`, the ISR latches updated motor commands into `SHARED_QUAD` and immediately re-arms `TGTTDR` via `preload_read()`. `Stm32I3cTarget::desired_ier()` (`desired_ier_for_tx()`) enables `EVR_TXFNFF` only while `read_pos < read_len` so multi-byte reads (`> 8` bytes) refill in ISR without FIFO underruns or idle interrupt storms. `Stm32I3cTarget::preload_read()` clamps read-prefetch lengths to the remaining map extent, skips `CFGR_TXFLUSH` when `EVR_TXFEF` is already set, and arms `TGTTDR` without toggling `I3C2_CFGR.EN`.
+
+Meanwhile, `i3c_target_task` runs on an Embassy `InterruptExecutor` bound to `TIM6` (`Priority::P2`) every `1 ms`, masking `I3C2_EV` and `I3C2_ER` (`with_i3c2_target()`) while running `sync_telemetry_into_target()` (when `is_frame_idle()`) and `check_and_recover_stuck_sda()` (which pulses `RCC_APB3RSTR.I3C2RST` if `PB4` (`SDA`) remains low continuously for 50 ms), and feeding `IWDG` when `I3C2_BUS_HEALTHY` holds. `ADC1` uses `ThreadModeRawMutex` so analog conversions never mask bus interrupts.
 
 Supported Control Table registers include:
 
