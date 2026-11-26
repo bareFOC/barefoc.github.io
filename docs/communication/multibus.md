@@ -318,6 +318,32 @@ When an external host controller issues command `0x55` to register `0x123` (`Sav
 
 - **Safety & Calibration Registers Exposed**: `MinPositionLimit` (`0x57`), `MaxPositionLimit` (`0x58`), `StallTimeoutMs` (`0x59`), `HardwareErrorStatus` (`0x5A`, RO), `PresentBusVoltage` (`0x5B`, RO), `PresentTemperature` (`0x5C`, RO), `CalibCommand` (`0xB0`), `REG_SAVE_CONFIG`, and `REG_TOPOLOGY_MODE`.
 - **Runtime Sensor & Bus Registers Exposed**: `SensorBusFreqHz` (`0xB5`, `u32` R/W), `SensorRange` (`0xB6`, `u8` R/W), `SensorAveraging` (`0xB7`, `u8` R/W), `SensorCrcEnable` (`0xB8`, `u8` R/W), and `SensorFaultStatus` (`0xB9`, `u8` RO), persisted across power cycles in `ControlTable` EEPROM (`0x54..0x5A`) via `SaveConfig`.
+
+---
+
+## 7. Multi-Servo I3C Bus Addressing & Selective OTA
+
+When multiple `FishyServo` nodes share a single MIPI I3C bus, each STM32H5 target (`Stm32I3cTarget` in `barefoc-stm32::bus_target_i3c` and `bareBoot`) derives its 48-bit Provisional ID (`I3C2_EPIDR`) from the full 16-bit XOR mix of the MCU's 96-bit factory UID:
+
+```rust
+let epidr = (0x0114 << 17) | ((uid0 ^ uid1 ^ uid2) & 0xFFFF);
+```
+
+This matches `bareBoot`'s `I3C2_EPIDR` encoding and reduces `ENTDAA` arbitration collisions across servos from 1/16 to 1/65,536.
+
+### Bus Discovery & Target Selection
+
+Host tooling (`bareBoot/host/scripts/flash_app_over_i3c_usb.py` and `FishyServo/test-scripts/benchmark_fishyservo_i3c.py`) supports:
+- `--scan`: Issues `RSTDAA` followed by sequential `ENTDAA` assignments starting at `0x40` until no unassigned targets remain, printing each target's dynamic address, 48-bit `provisional_id`, `BCR`, and `DCR`.
+- `--addr <hex>`: Targets a specific dynamic address (e.g. `--addr 0x41`).
+- `--pid <hex>`: Scans the bus and selects the target matching the 48-bit `provisional_id` (exact or prefix match, case-insensitive).
+
+### Selective Single-Servo OTA Flashing
+
+To flash one servo on a populated bus without disturbing sibling servos, `flash_app_over_i3c_usb.py --addr <hex>` or `--pid <hex>`:
+1. Sends a unicast `0xF0` reboot strobe over I3C SDR (`private_write`) only to the selected target's dynamic address.
+2. Skips `RSTDAA` so all other servos retain their active dynamic addresses.
+3. Runs `ENTDAA` to assign a dynamic address to the rebooted `bareBoot` target and streams the firmware update to that node alone.
 - **R/W Bridge Seeding (`sync_rw_from_bridge` / `sync_rw_from_bridge_multi`)**: Both `simplefoc_profile` and `multi_motor_profile` seed all R/W `RegMap` slots from `RegisterBridge::read_reg()` upon construction, and `refresh_telemetry_multi` re-seeds R/W slots whenever `MotorSelect` changes so host reads always reflect live firmware state from boot without prior host writes.
 - **Unified `SafetySupervisor` (`bareFOC::safety`)**: Evaluates soft travel limits (pre-drive clamping), kinematic stall with startup/reversal breakaway grace (distinguishing heavy moving loads from hard-stop/gear-slip stalls), enable-edge target step guard (`max_enable_step_rad`), single-tick angle jump guard (`max_angle_jump_rad`, disarming with `SENSOR_FAULT`), sustained wrong-direction runaway guard (`runaway_timeout_ms`), `I²t` + instantaneous overcurrent, bus-voltage derating, `OVERVOLTAGE`/`UNDERVOLTAGE`/`OVERHEAT` disarm, `DRIVER_FAULT`, `SENSOR_FAULT` (`SensorStatus`), stepper `DESYNC`, and host `COMM_TIMEOUT` watchdog in `O(1)` per 1 kHz tick.
 - **Sensor Sample Validation (`Sensor::update`)**: `Sensor::update()` rejects non-finite (`NaN`/infinite), out-of-`[0, 2π)`, and faulted (`SensorStatus != Ok`) samples before updating `angle_prev` or `full_rotations`, preventing transient bus glitches from corrupting multi-turn wrap counts.
