@@ -146,3 +146,30 @@ KA <j>        # Read Joint measured angle (rad)
 KV <j>        # Read Joint measured velocity (rad/s)
 KM <mode>     # Set topology preset (0=Four1Dof, 1=Diff2Dof, 2=Parallel2Dof, 3=QuadCoord)
 ```
+
+---
+
+## Runtime Kinematics & TOML Commissioning (Flash-Once Workflow)
+
+FishyServo separates fixed PCB hardware pinouts (`barefoc.toml`, auto-deriving `memory.x` in `build.rs` from `board.mcu` and `bootloader`) from per-joint robot kinematics (`TopologyPreset`, `sensor_map`, `DynamicTransmission` variant, `CoupledDifferential` matrix, `LinearGear` ratio/backlash, `FourBarLinkage` lengths, `LutTransmission` table, joint zero offsets, and outer joint PIDs).
+
+### Non-Volatile Persistence (`H5FlashStorage` v2)
+
+`H5FlashStorage` (`FLASH_SCHEMA_VERSION = 2`) stores a 320-byte ping-pong record (32-byte header + 96-byte `ControlTable` EEPROM + 192-byte `KinematicsFlashConfig`) protected by IEEE 802.3 CRC32 across Bank 2 Sectors 14 & 15 (`0x0801_C000..0x0802_0000`). On `SaveConfig` (`0x55` written to `REG_SAVE_CONFIG` at `0x230`), both motor settings and active kinematics are committed atomically and restored on every cold boot.
+
+### Host TOML Commissioning (`configure_fishyservo_i3c.py`)
+
+Boards can be flashed once with `fishyservo_stm32h5_i3c.bin` and commissioned over native `AgentLaI3c` USB from any `.toml` profile using stdlib `tomllib`:
+
+```sh
+# 1. Scan I3C bus via RSTDAA + ENTDAA
+python3 FishyServo/test-scripts/configure_fishyservo_i3c.py --scan
+
+# 2. Read current kinematics, topology, sensor_map, and PIDs
+python3 FishyServo/test-scripts/configure_fishyservo_i3c.py --addr 0x40 --show
+
+# 3. Commission from a TOML profile and persist to Bank 2 Sectors 14 & 15
+python3 FishyServo/test-scripts/configure_fishyservo_i3c.py --addr 0x40 --config servo_profile.toml --save --show
+```
+
+Supported TOML sections include `[identity]` (`node_id`), `[kinematics]` (`topology`, `sensor_map`, `transmission`, `gear_ratio`, `backlash_delta`, `joint_offset_alpha`, `joint_offset_beta`, `outer_downsample`), `[kinematics.differential]` (`matrix`), `[kinematics.linkage]` (`l1..l4`), `[kinematics.lut]` (`mot_min`, `mot_max`, `table`), `[kinematics.outer_pid_alpha]`, `[kinematics.outer_pid_beta]`, and `[defaults]` / `[motor]`.
