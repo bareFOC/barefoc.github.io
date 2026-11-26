@@ -68,7 +68,7 @@ At startup, the firmware runs `Tmag5273::discover(&mut i2c1, &CLOCK)` across can
 
 ### 3. Dedicated High-Priority MultiBus Server & Zero-Lockout Recovery
 
-Host communications on `I3C2` run inside an Embassy `InterruptExecutor` bound to `TIM6` (`Priority::P2`), woken directly on `I3C2_EV`/`I3C2_ER` (`Priority::P1`) (`I3C2_EVENT_IRQ_MASK` without mid-read `TXFNFF` preemption) rather than polling delays, while `ADC1` uses `ThreadModeRawMutex` so analog conversions never mask bus interrupts. `Stm32I3cTarget::preload_read()` clamps read-prefetch lengths to the remaining map extent and arms `TGTTDR` without toggling `I3C2_CFGR.EN`, and `check_and_recover_stuck_sda()` pulses `RCC_APB3RSTR.I3C2RST` if `PB4` (`SDA`) remains low continuously for 50 ms.
+Host communications on `I3C2` run inside an Embassy `InterruptExecutor` bound to `TIM6` (`Priority::P2`), woken directly on `I3C2_EV`/`I3C2_ER` (`Priority::P1`) (`I3C2_EVENT_IRQ_MASK` without mid-read `TXFNFF` preemption) rather than polling delays, while `ADC1` uses `ThreadModeRawMutex` so analog conversions never mask bus interrupts. `Stm32I3cTarget::preload_read()` clamps read-prefetch lengths to the remaining map extent, skips `CFGR_TXFLUSH` when `EVR_TXFEF` is already set, and arms `TGTTDR` without toggling `I3C2_CFGR.EN`. After telemetry updates in `i3c_target_task`, `Stm32I3cTarget::refresh_read_buffer()` refreshes the preloaded TX FIFO whenever the frame is idle (`is_frame_idle()` and no pending `RXFNEF`/`FCF`), and `check_and_recover_stuck_sda()` pulses `RCC_APB3RSTR.I3C2RST` if `PB4` (`SDA`) remains low continuously for 50 ms.
 
 Supported Control Table registers include:
 
@@ -86,7 +86,7 @@ The firmware supports zero-touch entry into BareBoot recovery through four indep
 1. **Single-Byte Strobe**: Sending byte `0xF0` to target address `0x40` invokes `bootloader_write_hook`, clears `BootLoopGuard`, writes `SoftResetMailbox` (`0x2000_7FE0`), and resets into BareBoot.
 2. **Hardware Target Reset Pattern (`EVR_RSTF`) & CCC `RSTACT`**: Driving the MIPI I3C Target Reset Pattern or `CCC RSTACT` (`0x2A`/`0x9A`/`0xAA`, defining byte `0x02`) triggers `barefoc_failsafe_recovery()`.
 3. **Register Command**: Writing `0x02` to register `0xDE` (`REG_REBOOT_CMD`) performs the same mailbox-guided reboot sequence.
-4. **Watchdog & 3-Strike BootLoopGuard**: `fishyservo_stm32h5` feeds the ~2.0 s hardware `IWDG` only while `I3C2_BUS_HEALTHY` holds (withholding `IWDG` feeds if `SDA` stays stuck low after `RCC_APB3RSTR` recovery) and clears `BootLoopGuard` (`0x2000_7FD0`) after 500 ms of healthy `I3C2` + motor execution. The bootloader slot spans 96 KB (`0x0800_2000..0x0801_A000`, `_stack_start = 0x2000_7FD0`), preserving Sector 13 (`CommitStore`) and Sectors 14–15 (`H5FlashStorage`).
+4. **Watchdog, 3-Strike BootLoopGuard & Sector 15 Auto-Provisioning**: `fishyservo_stm32h5` feeds the ~2.0 s hardware `IWDG` only while `I3C2_BUS_HEALTHY` holds (withholding `IWDG` feeds if `SDA` stays stuck low after `RCC_APB3RSTR` recovery) and clears `BootLoopGuard` (`0x2000_7FD0`) after 50 ms (50 control-loop ticks) of healthy `I3C2` + motor execution. When Sector 15 (`0x0801_E000`) is blank (`0xFFFF_FFFF`) on first boot, `load_boot_config()` auto-provisions default `ControlTable` settings to `H5FlashStorage` and clears `FLASH_CORRUPT` (`0x80`) so `HwErr` boots at `0x00`. The bootloader slot spans 96 KB (`0x0800_2000..0x0801_A000`, `_stack_start = 0x2000_7FD0`), preserving Sector 13 (`CommitStore`) and Sectors 14–15 (`H5FlashStorage`).
 
 ---
 

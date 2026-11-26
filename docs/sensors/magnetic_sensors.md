@@ -88,10 +88,13 @@ use tmag_rs::barefoc::Tmag5273Sensor;
 // 1. Auto-discover sensor address and silicon variant (A1..D2)
 let (addr, variant) = discover(&mut i2c_bus).expect("TMAG5273 not found");
 
-// 2. Initialize driver and wrap with BareFOC Sensor adapter
+// 2. Initialize driver (with optional I2C CRC-8 integrity) and wrap with BareFOC Sensor adapter
 let driver = Tmag5273::builder(i2c_bus, addr)
     .variant(variant)
+    .crc_enabled(true) // Appends CRC-8 (poly 0x07, init 0xFF) on writes & verifies reads
     .build()
     .unwrap();
 let sensor = Tmag5273Sensor::new(driver);
 ```
+
+When `crc_enabled` is `true`, `Tmag5273` appends the TI TMAG5273 CRC-8 byte (`0x07` polynomial, `0xFF` init) to register writes and verifies the trailing CRC-8 byte on `read_register`, `read_registers`, and `read_angle`, returning `Error::CrcMismatch` on bus corruption so `Tmag5273Sensor` preserves its last valid angle.
