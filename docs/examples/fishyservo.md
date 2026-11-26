@@ -88,7 +88,7 @@ The firmware supports zero-touch entry into BareBoot recovery through four indep
 1. **Single-Byte Strobe**: Sending byte `0xF0` to target address `0x40` invokes `bootloader_write_hook`, clears `BootLoopGuard`, writes `SoftResetMailbox` (`0x2000_7FE0`), and resets into BareBoot.
 2. **Hardware Target Reset Pattern (`EVR_RSTF`) & CCC `RSTACT`**: Driving the MIPI I3C Target Reset Pattern or `CCC RSTACT` (`0x2A`/`0x9A`/`0xAA`, defining byte `0x02`) triggers `barefoc_failsafe_recovery()`.
 3. **Register Command**: Writing `0x02` to register `0xDE` (`REG_REBOOT_CMD`) performs the same mailbox-guided reboot sequence.
-4. **Watchdog, 3-Strike BootLoopGuard & Sector 15 Auto-Provisioning**: `fishyservo_stm32h5` feeds the ~2.0 s hardware `IWDG` only while `I3C2_BUS_HEALTHY` holds (withholding `IWDG` feeds if `SDA` stays stuck low after `RCC_APB3RSTR` recovery) and clears `BootLoopGuard` (`0x2000_7FD0`) after 50 ms (50 control-loop ticks) of healthy `I3C2` + motor execution. When Sector 15 (`0x0801_E000`) is blank (`0xFFFF_FFFF`) on first boot, `load_boot_config()` auto-provisions default `ControlTable` settings to `H5FlashStorage` and clears `FLASH_CORRUPT` (`0x80`) so `HwErr` boots at `0x00`. The bootloader slot spans 96 KB (`0x0800_2000..0x0801_A000`, `_stack_start = 0x2000_7FD0`), preserving Sector 13 (`CommitStore`) and Sectors 14–15 (`H5FlashStorage`).
+4. **Watchdog, 3-Strike BootLoopGuard & Sector 15 Auto-Provisioning**: `fishyservo_stm32h5` feeds the ~2.0 s hardware `IWDG` only while `I3C2_BUS_HEALTHY` holds (withholding `IWDG` feeds if `SDA` stays stuck low after `RCC_APB3RSTR` recovery) and clears `BootLoopGuard` (`0x2000_7FD0`) after 50 ms (50 control-loop ticks) of healthy `I3C2` + motor execution. When Sector 15 (`0x0801_E000`) is blank (`0xFFFF_FFFF`) on first boot, `load_boot_config()` auto-provisions default `ControlTable` settings to `H5FlashStorage` and clears `FLASH_CORRUPT` (`0x80`) so `HwErr` boots at `0x00`. The STM32H503 flash map allocates 16 KiB (`0x0800_0000..0x0800_3FFF`, Sectors 0–1) to `bareBoot` and 88 KiB (`0x0800_4000..0x0801_9FFF`, Sectors 2–12, `_stack_start = 0x2000_7FD0`) to the application slot, preserving Sector 13 (`CommitStore`, `0x0801_A000..0x0801_BFFF`) and Sectors 14–15 (`H5FlashStorage`, `0x0801_C000..0x0801_FFFF`).
 
 ---
 
@@ -116,7 +116,7 @@ cargo run --release
 
 ### Bootloader Relocated Build
 
-When deploying via Katapult or BareBoot (application slot starting at `0x0800_2000`):
+When deploying via BareBoot (16 KiB bootloader at `0x0800_0000..0x0800_3FFF`, 88 KiB application slot at `0x0800_4000..0x0801_9FFF`):
 
 ```sh
 cargo build --release --features bootloader
