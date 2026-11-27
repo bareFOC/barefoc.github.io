@@ -14,7 +14,7 @@ contract with typed joint channels, atomic multi-axis dispatch, cached
 telemetry and a fail-safe disarm.
 
 The bridge itself is host-side and therefore uses `std`: Copper is a host
-framework. The actuator-side SDK it reuses, [`barefoc-master`](/master/), stays
+framework. The actuator-side SDK it reuses, [`barefoc-master`](/tools/master/), stays
 `#![no_std]` and zero-heap. No new register definitions are introduced in the
 bridge; all addresses come from the [Universal Control Table](/actuators/control_table/).
 
@@ -221,7 +221,7 @@ conversion, capacity error propagation and emergency disarm.
 
 ## Related pages
 
-- [Master Controller SDK](/master/)
+- [Master Controller SDK](/tools/master/)
 - [MultiBus register transport](/communication/multibus/)
 - [CAN Bus Protocol](/communication/can/)
 - [SIL simulation](/simulation/sil_testing/)

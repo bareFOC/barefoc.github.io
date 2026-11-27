@@ -95,8 +95,9 @@ flowchart TD
    - [UART Serial Protocol](/bareboot/protocols/uart/) (In-band magic tokens, framed break commands)
    - [USB CDC & DFU Protocol](/bareboot/protocols/usb/) (1200-baud touch, `DFU_DETACH`, vendor control endpoints)
 
-4. [**GUI Workbench & Flasher**](/bareboot/tui/):
-   Cross-platform graphical workbench, `bareboot-engine` headless pipeline, makeflash orchestration, and integration into `bareConfig`.
+4. [**Tools & Utilities**](/bareboot/tools/):
+   - [**GUI Workbench & Flasher**](/bareboot/tools/tui/): Cross-platform graphical workbench, `bareboot-engine` headless pipeline, makeflash orchestration, and integration into `bareConfig`.
+   - [**Host Flashtool Reference**](/bareboot/tools/flashtool/): Command-line flashing guide with `bareboot-cli` and `multidrop_flashtool.py`.
 
-5. [**Host Flashtool Reference**](/bareboot/flashtool/):
-   Command-line flashing guide with `bareboot-cli` and `multidrop_flashtool.py`.
+5. [**Configuration Reference**](/bareboot/config_reference/):
+   Klipper-style TOML reference for `bareboot.toml` and `bareboot-engine` `TargetConfig`.

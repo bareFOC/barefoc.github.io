@@ -1,9 +1,9 @@
 ---
 layout: default
 title: "GUI Workbench & bareConfig Flasher"
-nav_order: 4
-parent: "BareBoot"
-permalink: /bareboot/tui/
+nav_order: 1
+parent: "Tools & Utilities"
+permalink: /bareboot/tools/tui/
 description: "Graphical workbench architecture, bareboot-engine headless pipeline, makeflash orchestration, and bareConfig integration"
 ---
 

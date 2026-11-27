@@ -3,7 +3,7 @@ layout: default
 title: "Master Controller SDK"
 parent: "Tools & Utilities"
 nav_order: 2
-permalink: /master/
+permalink: /tools/master/
 ---
 
 # Master Controller SDK (`barefoc-master`)

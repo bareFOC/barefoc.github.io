@@ -8,7 +8,7 @@ permalink: /communication/bus_passthrough/
 
 # Bus Passthrough (`barefoc-passthrough`)
 
-Bus passthrough lets a PC running the [Master Controller SDK](/master/) reach
+Bus passthrough lets a PC running the [Master Controller SDK](/tools/master/) reach
 downstream BareFOC actuator nodes through a flight controller's (FC) existing
 USB or USART link, without a separate USB-to-I2C/UART adapter. The FC acts as a
 transport-to-transport bridge: each framed request is decoded into an ordinary
@@ -226,7 +226,7 @@ implementations. No test requires hardware.
 
 ## Related pages
 
-- [Master Controller SDK](/master/)
+- [Master Controller SDK](/tools/master/)
 - [MultiBus register transport](/communication/multibus/)
 - [Universal Control Table](/actuators/control_table/)
 - [Copper Bridge (`cu-barefoc`)](/communication/copper_bridge/)

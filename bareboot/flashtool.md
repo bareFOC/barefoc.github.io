@@ -1,9 +1,9 @@
 ---
 layout: default
 title: "Host Flashtool Reference"
-nav_order: 5
-parent: "BareBoot"
-permalink: /bareboot/flashtool/
+nav_order: 2
+parent: "Tools & Utilities"
+permalink: /bareboot/tools/flashtool/
 description: "Command-line flashing reference for bareboot-cli and multidrop_flashtool.py across I2C, I3C, UART, and USB"
 ---
 

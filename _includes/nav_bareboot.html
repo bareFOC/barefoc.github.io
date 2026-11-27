@@ -15,9 +15,23 @@
             {%- assign children_list = pages_list | where: "parent", node.title -%}
             <ul class="navigation-list-child-list" style="list-style-type: none; display: block;">
               {%- for child in children_list -%}
+                {%- if child.url contains '/bareboot/' -%}
                 <li class="navigation-list-item child-list" data-url="{{ child.url }}">
                   <a href="{{ child.url | absolute_url }}" class="navigation-list-link">{{ child.title }}</a>
+                  {%- if child.has_children -%}
+                    {%- assign grand_children_list = pages_list | where: "parent", child.title -%}
+                    <ul class="navigation-list-child-list" style="list-style-type: none; display: block;">
+                      {%- for grand_child in grand_children_list -%}
+                        {%- if grand_child.url contains '/bareboot/' -%}
+                        <li class="navigation-list-item grand-child-list" data-url="{{ grand_child.url }}">
+                          <a href="{{ grand_child.url | absolute_url }}" class="navigation-list-link">{{ grand_child.title }}</a>
+                        </li>
+                        {%- endif -%}
+                      {%- endfor -%}
+                    </ul>
+                  {%- endif -%}
                 </li>
+                {%- endif -%}
               {%- endfor -%}
             </ul>
           {%- endif -%}
