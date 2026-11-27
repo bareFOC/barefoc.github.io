@@ -8,7 +8,7 @@ permalink: /examples/fishyservo/
 
 # FishyServo Reference Example (STM32H503KB)
 
-The FishyServo example (`examples/fishyservo_stm32h5`) is the canonical BareFOC reference implementation for 4-axis multi-topology closed-loop brushed DC servo control. It runs on the [FishyServo hardware platform](https://github.com/rambros3d/FishyServo), pairing an STM32H503KBU6 microcontroller with dual Texas Instruments DRV8411A dual H-bridge motor drivers.
+The FishyServo board (`examples/fishyservo/barefoc.toml`) is the canonical BareFOC reference implementation for 4-axis multi-topology closed-loop brushed DC servo control, built via the unified `barefoc-firmware` crate. It runs on the [FishyServo hardware platform](https://github.com/rambros3d/FishyServo), pairing an STM32H503KBU6 microcontroller with dual Texas Instruments DRV8411A dual H-bridge motor drivers.
 
 ---
 
@@ -97,7 +97,7 @@ The firmware supports zero-touch entry into BareBoot recovery through four indep
 ### Directory Location
 
 ```sh
-cd bareFOC/examples/fishyservo_stm32h5
+cd bareFOC/barefoc-firmware
 ```
 
 ### Standalone Build
@@ -105,13 +105,13 @@ cd bareFOC/examples/fishyservo_stm32h5
 For running directly on bare metal without a bootloader:
 
 ```sh
-cargo build --release
+BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5
 ```
 
 Flash using SWD:
 
 ```sh
-cargo run --release
+BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo run --release --target thumbv8m.main-none-eabihf --features stm32h5
 ```
 
 ### Bootloader Relocated Build
@@ -119,15 +119,15 @@ cargo run --release
 When deploying via BareBoot (16 KiB bootloader at `0x0800_0000..0x0800_3FFF`, 88 KiB application slot at `0x0800_4000..0x0801_9FFF`):
 
 ```sh
-cargo build --release --features bootloader
+BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
 ```
 
 Extract the raw binary image:
 
 ```sh
 arm-none-eabi-objcopy -O binary \
-  target/thumbv8m.main-none-eabihf/release/fishyservo_stm32h5 \
-  target/thumbv8m.main-none-eabihf/release/fishyservo_stm32h5_bootloader.bin
+  target/thumbv8m.main-none-eabihf/release/barefoc-firmware \
+  ../examples/fishyservo/fishyservo_stm32h5_i3c.bin
 ```
 
 ---
