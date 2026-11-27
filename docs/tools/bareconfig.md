@@ -1,7 +1,8 @@
 ---
 layout: default
 title: "bareConfig Workbench"
-nav_order: 12
+parent: "Tools & Utilities"
+nav_order: 1
 permalink: /tools/bareconfig/
 ---
 

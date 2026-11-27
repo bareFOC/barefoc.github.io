@@ -1,7 +1,8 @@
 ---
 layout: default
 title: "Master Controller SDK"
-nav_order: 12
+parent: "Tools & Utilities"
+nav_order: 2
 permalink: /master/
 ---
 

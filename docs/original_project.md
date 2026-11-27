@@ -1,7 +1,7 @@
 ---
 layout: default
 title: "Original Project"
-nav_order: 11
+nav_order: 21
 description: "Architecture, authors, resources, and academic citation for the upstream Arduino SimpleFOC project."
 permalink: /original_project/
 ---

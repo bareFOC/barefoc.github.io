@@ -1,7 +1,7 @@
 ---
 layout: default
 title: "Contributing & Community"
-nav_order: 12
+nav_order: 20
 description: "Community, issues, and contributing to BareFOC."
 permalink: /contact/
 ---
