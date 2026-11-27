@@ -70,9 +70,33 @@ When `[memory]` (or any individual field inside it) is omitted, `MemoryLayout::d
 
 ---
 
+### `[communication]` *(optional)*
+
+Host-facing communication bus, pin assignments (with optional Klipper-style `!`/`^`/`~` modifiers), bitrate, and target address. Shared identically with `bareboot.toml`.
+
+```toml
+[communication]
+transports = ["i3c", "i2c"]
+#   Enabled communication transports ("i3c", "i2c", "uart", "can", "usb").
+bus = "I3C1"
+#   MCU peripheral name ("I3C1", "FDCAN1", "USART1", "I2C1"). Optional.
+tx_scl_pin = "PB3"
+#   TX / SCL / CAN_TX pin. Optional.
+rx_sda_pin = "PB4"
+#   RX / SDA / CAN_RX pin. Optional.
+#can_enable_pin = "PC13"
+#   Optional CAN transceiver enable pin.
+bitrate = 1000000
+#   Default bus bitrate in bps (e.g., 1000000 = 1 MHz I3C SDR / 1 Mbps CAN). Default: 250000.
+address = 0x40
+#   Static/proposed 7-bit I2C or I3C target address. Optional.
+```
+
+---
+
 ### `[bootloader]` *(optional)*
 
-Configures bootloader handoff, boot window, and SRAM mailbox synchronization.
+Configures bootloader handoff, boot window, safe startup pins, and SRAM mailbox synchronization. Shared identically with `bareboot.toml`.
 
 ```toml
 [bootloader]
@@ -80,14 +104,12 @@ enabled = true
 #   Whether the application links behind a bootloader slot. Default: true.
 type = "bareboot"
 #   Bootloader type: "bareboot" or "katapult". Default: "bareboot".
-transport = "i3c"
-#   Bootloader bus transport: "i3c", "i2c", "uart", or "can". Default: "uart".
 boot_window_ms = 250
 #   Bootloader wait window before jumping to app, in milliseconds. Default: 250.
-#baud_rate = 250000
-#   UART baud rate when transport = "uart". Default: 250000.
-i2c_address = 0x40
-#   Static/proposed 7-bit I2C or I3C address. Optional.
+preserve_nvm = true
+#   Whether flashing preserves the application NVM sectors. Default: true.
+#initial_safe_pins = ["!PA9", "^PB12"]
+#   Optional Klipper-style safe startup pins (auto-derived from [gate_driver] if omitted).
 mailbox_address = 0x20007FE0
 #   SRAM address of the soft-reset / boot-loop mailbox. Default: 0x20007FF8.
 mailbox_magic = 0x5984E3FA6CA1589B
@@ -164,7 +186,9 @@ gear_ratio = 1.0
 
 ### `[gate_driver]` and `[[gate_driver.channels]]`
 
-Defines the power stage topology, PWM frequency, and per-channel bridge pins.
+Defines the power stage topology, PWM frequency, and per-channel bridge pins. All pin fields support Klipper-style modifiers (`!` inverted/active-low, `^` pull-up, `~` pull-down, e.g. `fault_pin = "^!PB12"`, `cs_pin = "!PC4"`).
+
+When `[[gate_driver.channels]]` is populated (e.g. 4-channel H-bridge boards), `inh_a`, `inh_b`, and `inh_c` are optional and do not need dummy placeholders.
 
 ```toml
 [gate_driver]
@@ -174,18 +198,18 @@ pwm_frequency_hz = 25000
 #   PWM carrier frequency in Hz. Required.
 pwm_timer = "TIM1+TIM3"
 #   MCU timer peripheral(s) driving PWM outputs. Required.
-inh_a = "PA15"
-inh_b = "PA8"
-inh_c = "PA6"
-#   Primary phase / high-side PWM pins. Required.
-inl_a = "PB5"
-inl_b = "PB15"
-inl_c = "PA7"
+#inh_a = "PA10"
+#inh_b = "PA9"
+#inh_c = "PA8"
+#   Primary phase / high-side PWM pins (required when [[gate_driver.channels]] is empty).
+#inl_a = "PB15"
+#inl_b = "PB14"
+#inl_c = "PB13"
 #   Complementary / low-side or enable pins. Optional.
 sleep_pin = "PA9"
-#   Active-low sleep / driver enable GPIO pin. Optional.
-#fault_pin = "PB12"
-#   Hardware nFAULT input pin. Optional.
+#   Sleep / driver enable GPIO pin. Optional.
+#fault_pin = "^!PB12"
+#   Hardware nFAULT input pin (supports ^ pull-up and ! inverted). Optional.
 
 [[gate_driver.channels]]
 #   Optional per-channel H-bridge / half-bridge descriptors for multi-axis boards.
@@ -209,12 +233,14 @@ sensor_type = "tmag5273"
 #   Position sensor type ("tmag5273", "mt6701", "as5600", "as5048a", "abi", etc.). Required.
 bus = "I2C1"
 #   MCU bus peripheral ("I2C1", "SPI2", etc.). Required.
-#cs_pin = "PB12"
+#cs_pin = "!PA4"
 #   SPI chip-select pin (for SPI sensors). Optional.
 clk_pin = "PB6"
 #   SCL / SCK pin name. Optional.
 data_pin = "PB7"
-#   SDA / MOSI / MISO pin name. Optional.
+#   SDA / MISO pin name. Optional.
+#mosi_pin = "PA7"
+#   MOSI pin name (for SPI sensors). Optional.
 cpr = 65536
 #   Counts per revolution (e.g., 65536 for 16-bit, 16384 for 14-bit). Required.
 
@@ -224,24 +250,6 @@ channel = 0
 bus = "I2C1"
 address = 0x35
 mux_channel = 0
-```
-
----
-
-### `[connectors]` *(optional)*
-
-Host-facing communication connector and default bus speed.
-
-```toml
-[connectors]
-bus_type = "i3c"
-#   Host bus type: "i3c", "i2c", "uart", "can", or "spi". Default: "uart".
-tx_scl_pin = "PB3"
-#   TX / SCL pin name. Optional.
-rx_sda_pin = "PB4"
-#   RX / SDA pin name. Optional.
-default_baud = 1000000
-#   Default bus bitrate in Hz (e.g., 1000000 = 1 MHz I3C SDR). Default: 250000.
 ```
 
 ---

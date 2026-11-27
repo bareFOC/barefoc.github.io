@@ -61,11 +61,19 @@ mcu = "stm32g431cbu6"
 family = "stm32g4"
 system_clock_hz = 170000000
 
+[communication]
+transports = ["can"]
+bus = "FDCAN1"
+tx_scl_pin = "PB9"
+rx_sda_pin = "PB8"
+can_enable_pin = "PC13"
+bitrate = 1000000
+
 [bootloader]
 enabled = false
 type = "bareboot"
-transport = "can"
 boot_window_ms = 250
+preserve_nvm = true
 
 [safety]
 max_voltage_v = 24.0
@@ -85,20 +93,20 @@ inh_c = "PA8"
 inl_a = "PB15"
 inl_b = "PB14"
 inl_c = "PB13"
+cs_pin = "!PC4"
+spi_bus = "SPI3"
+spi_sck_pin = "PB3"
+spi_mosi_pin = "PB5"
+spi_miso_pin = "PB4"
 
 [sensor]
 sensor_type = "mt6701"
 bus = "SPI1"
-cs_pin = "PA4"
+cs_pin = "!PA4"
 clk_pin = "PA5"
 data_pin = "PA6"
+mosi_pin = "PA7"
 cpr = 16384
-
-[connectors]
-bus_type = "can"
-tx_scl_pin = "PB9"
-rx_sda_pin = "PB8"
-default_baud = 1000000
 ```
 
 ---

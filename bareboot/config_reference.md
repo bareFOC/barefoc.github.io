@@ -4,79 +4,101 @@ title: "Configuration Reference"
 nav_order: 6
 parent: "BareBoot"
 permalink: /bareboot/config_reference/
-description: "Klipper-style TOML configuration reference for bareboot.toml and bareboot-engine TargetConfig"
+description: "Unified Klipper-style TOML configuration reference shared by bareboot.toml and barefoc.toml"
 ---
 
 # BareBoot Configuration Reference
 
-BareBoot supports declarative TOML configuration in two forms:
+BareBoot and BareFOC share a single unified Klipper-style TOML schema (`[board]`, `[memory]`, `[communication]`, `[bootloader]`) parsed identically by `bareConfig` and `bareboot-engine`:
 
-1. **Standalone `bareboot.toml` (`configs/bareboot-*.toml`)**: Flat board definition parsed by `bareConfig` (`BarebootTomlConfig`) and `bareboot-engine`.
-2. **Engine `TargetConfig` (`bareboot.toml`)**: Structured `[runtime_defaults]` and `[memory]` sections used by `bareboot-engine` for builds and safe-pin synthesis.
-
-*(When a board already defines `[bootloader]` inside a BareFOC `barefoc.toml`, `bareConfig` derives the BareBoot configuration from `barefoc.toml` automatically.)*
+- **Standalone `bareboot.toml` (`configs/bareboot-*.toml`)**: Contains `[board]`, `[memory]`, `[communication]`, and `[bootloader]`.
+- **Unified `barefoc.toml`**: Contains the exact same four sections plus motor/driver/sensor sections. When `[bootloader].initial_safe_pins` is omitted, `bareboot-engine` auto-derives safe startup pins from `[gate_driver]`.
 
 ---
 
-## Standalone `bareboot.toml`
+## `[board]`
 
-Used by `configs/bareboot.toml` and `configs/bareboot-stm32h503.toml`:
+Defines the silicon target and core clock.
 
 ```toml
-target = "stm32h503"
-#   Target family / profile name (e.g., "stm32h503", "ch32v203", "stm32f1"). Required.
+[board]
+name = "stm32h503-generic"
+#   Optional human-readable board identifier.
 mcu = "stm32h503kb"
-#   Specific MCU part number. Optional.
+#   Specific MCU part number (e.g., "stm32h503kbu6", "ch32v203c8t6", "stm32f103c8").
+family = "stm32h5"
+#   Target MCU family ("stm32h5", "stm32g4", "stm32f1", "ch32v203").
 system_clock_hz = 64000000
 #   Bootloader core clock frequency in Hz. Default: 64000000.
+```
+
+---
+
+## `[memory]` *(optional — auto-derived)*
+
+Flash and SRAM partition boundaries shared identically with `barefoc.toml`:
+
+```toml
+[memory]
+flash_origin = 0x08000000
+#   Base flash address.
 flash_size = 131072
-#   Total internal flash size in bytes. Default: 0 (auto/target default).
+#   Total internal flash size in bytes.
+ram_origin = 0x20000000
+#   Base SRAM address.
 ram_size = 32768
-#   Total SRAM size in bytes. Default: 0 (auto/target default).
-app_base = 0x08004000
-#   Application slot start address (e.g., 0x08004000 for 16 KiB bootloader slot).
-#   Optional.
-boot_window_ms = 250
-#   Bootloader wait window in milliseconds before jumping to app. Default: 250.
-transports = ["i3c"]
-#   Enabled bootloader transports (e.g., ["i3c"], ["can", "i2c"], ["uart"]).
+#   Total SRAM size in bytes.
+bootloader_origin = 0x08000000
+#   Bootloader slot start address.
+bootloader_size = 16384
+#   Reserved bootloader slot size in bytes (e.g., 16384 = 16 KiB).
+app_origin = 0x08004000
+#   Application slot start address.
+app_size = 90112
+#   Application slot size in bytes (before CommitStore / NVM).
+nvm_origin = 0x0801C000
+#   Start of persistent NVM storage sectors.
+nvm_size = 16384
+#   Persistent NVM size in bytes.
+page_size = 8192
+#   Flash erase page/sector size in bytes.
+```
+
+---
+
+## `[communication]`
+
+Configures bootloader transport(s), bus pins, bitrate, and target address:
+
+```toml
+[communication]
+transports = ["i3c", "i2c"]
+#   Enabled bootloader transports ("i3c", "i2c", "can", "uart", "usb", "multi").
 #transport = "i3c"
-#   Single active transport override ("can", "i2c", "i3c", "uart", "usb"). Optional.
-#baud_rate = 250000
-#   UART baud rate when UART transport is enabled. Optional.
-#can_bitrate = 1000000
-#   CAN / CAN-FD bitrate in bps when CAN transport is enabled. Optional.
-i2c_target_address = 0x40
-#   7-bit I2C/I3C address (or proposed ENTDAA address). Optional.
+#   Optional single primary transport override.
+#tx_scl_pin = "PB3"
+#rx_sda_pin = "PB4"
+#can_enable_pin = "PC13"
+bitrate = 1000000
+#   Bus bitrate in bps (e.g., 1000000 = 1 MHz CAN/I3C, 250000 = UART). Optional.
+address = 0x40
+#   7-bit I2C/I3C target address (or proposed ENTDAA address). Optional.
 ```
 
 ---
 
-## Engine `TargetConfig` Format (`bareboot-engine`)
+## `[bootloader]`
 
-### Top-Level Fields
-
-```toml
-target = "stm32h503"
-#   Target identifier (must be non-empty). Required.
-transport = "i2c"
-#   Primary transport: "can", "i2c", "uart", "usb", or "multi". Default: "can".
-```
-
----
-
-### `[runtime_defaults]`
+Configures boot window, NVM preservation, Klipper-style safe startup pins, and soft-reset mailbox:
 
 ```toml
-[runtime_defaults]
+[bootloader]
+enabled = true
+#   Whether the application links behind a bootloader slot. Default: true.
+type = "bareboot"
+#   Bootloader type: "bareboot" or "katapult". Default: "bareboot".
 boot_window_ms = 250
-#   Startup wait window before auto-booting the application (ms).
-#node_id = 1
-#   Optional default CAN/bus node ID.
-#i2c_address = 0x40
-#   Optional 7-bit I2C/I3C target address.
-#uart_baud = 250000
-#   Optional UART baud rate.
+#   Startup wait window before auto-booting the application (ms). Default: 250.
 preserve_nvm = true
 #   Whether flashing preserves the application NVM sectors. Default: true.
 initial_safe_pins = ["!PA9", "PB1", "^PB12"]
@@ -85,28 +107,9 @@ initial_safe_pins = ["!PA9", "PB1", "^PB12"]
 #     "PA9"   -> drive high
 #     "!PA9"  -> drive low (e.g., keep gate driver nSLEEP / enable inactive)
 #     "^PB12" -> input with pull-up
-```
-
----
-
-### `[memory]`
-
-Optional memory map overrides for `bareboot-engine` (omitted fields fall back to target defaults):
-
-```toml
-[memory]
-#flash_start = 0x08000000
-#   Base flash address.
-#flash_size = 131072
-#   Total flash size in bytes.
-#bootloader_size = 16384
-#   Reserved bootloader slot size in bytes (e.g., 16384 = 16 KiB).
-#app_base = 0x08004000
-#   Application start address.
-#app_end = 0x0801A000
-#   Exclusive end of application flash slot (before CommitStore / NVM).
-#nvm_base = 0x0801C000
-#   Start of persistent NVM storage sectors.
-#page_size = 8192
-#   Flash erase page/sector size in bytes.
+#     "~PB1"  -> input with pull-down
+mailbox_address = 0x20007FE0
+#   SRAM address of the soft-reset / boot-loop mailbox. Optional.
+mailbox_magic = 0x5984E3FA6CA1589B
+#   64-bit magic signature requesting bootloader entry. Optional.
 ```
