@@ -58,32 +58,26 @@ flowchart TD
 name = "microspora-stm32g4"
 description = "MicroSpora BLDC FOC Motor Driver (STM32G431CBU6 + DRV8316 + MT6701)"
 mcu = "stm32g431cbu6"
-family = "stm32g4"
-system_clock_hz = 170000000
+status_leds = ["PC6"]
+vbus_adc_peripheral = "ADC1"
+vbus_adc_pin = "PB11"
+vbus_divider_scale = 11.0
 
-[communication.host]
-protocol = "can"
-role = "target"
-bootloader = false
-peripheral = "FDCAN1"
-tx_scl_pin = "PB9"
-rx_sda_pin = "PB8"
+[communication.fdcan1]
+tx_pin = "PB9"
+rx_pin = "PB8"
 can_enable_pin = "PC13"
 bitrate = 1000000
 
-[communication.encoder_bus]
-protocol = "spi"
+[communication.spi1]
 role = "master"
-peripheral = "SPI1"
 sck_pin = "PA5"
 miso_pin = "PA6"
 mosi_pin = "PA7"
 
 [bootloader]
 enabled = false
-type = "bareboot"
-boot_window_ms = 250
-preserve_nvm = true
+status_led = "PC6"
 
 [safety]
 max_voltage_v = 24.0
@@ -99,15 +93,10 @@ current_limit = 2.0
 velocity_limit = 50.0
 
 [gate_driver]
-driver_type = "drv8316"
-pwm_frequency_hz = 25000
-pwm_timer = "TIM1"
-inh_a = "PA10"
-inh_b = "PA9"
-inh_c = "PA8"
-inl_a = "PB15"
-inl_b = "PB14"
-inl_c = "PB13"
+type = "drv8316"
+topology = "half_bridge"
+high_pwm_pin = ["PA10", "PA9", "PA8"]
+low_pwm_pin = ["PB15", "PB14", "PB13"]
 cs_pin = "!PC4"
 spi_bus = "SPI3"
 spi_sck_pin = "PB3"
@@ -116,9 +105,8 @@ spi_miso_pin = "PB4"
 
 [sensor.motor]
 type = "mt6701"
-bus = "encoder_bus"
+bus = "spi1"
 cs_pin = "!PA4"
-cpr = 16384
 ```
 
 ---
