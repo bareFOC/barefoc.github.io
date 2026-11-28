@@ -108,8 +108,23 @@ initial_safe_pins = ["!PA9", "PB1", "^PB12"]
 #     "!PA9"  -> drive low (e.g., keep gate driver nSLEEP / enable inactive)
 #     "^PB12" -> input with pull-up
 #     "~PB1"  -> input with pull-down
+status_led = "!PA1"
+#   Optional Klipper-style single status LED pin ("!<PIN>" for active-low,
+#   "<PIN>" for active-high). Omit if no status LED is attached (zero-cost no-op).
 mailbox_address = 0x20007FE0
 #   SRAM address of the soft-reset / boot-loop mailbox. Optional.
 mailbox_magic = 0x5984E3FA6CA1589B
 #   64-bit magic signature requesting bootloader entry. Optional.
 ```
+
+### Status LED Blink Patterns
+
+When `[bootloader].status_led` is configured, `bareboot-core` drives deterministic single-LED patterns in priority order:
+
+| Priority | State | Condition | Pattern (`ms % 1000`) |
+| --- | --- | --- | --- |
+| 1 | `Flashing` | Active `RX_BLOCK` / `RX_EOF` / `COMPLETE` (`flash_activity_ms > 0`) | 10 Hz fast blink (50 ms on / 50 ms off) |
+| 2 | `BootLoopError` | Boot-loop trap (`>= 3` fault resets) or flash write/commit error | Triple-blink (`0..80`, `160..240`, `320..400` ms) |
+| 3 | `BlankApp` | No valid application vector or CRC32 in flash | Double-blink (`0..100`, `200..300` ms) |
+| 4 | `BootWindow` | Waiting for host activity before jumping to app | Solid ON |
+| 5 | `Parked` | Valid app present, parked in bootloader via mailbox or bus activity | 1 Hz heartbeat (500 ms on / 500 ms off) |

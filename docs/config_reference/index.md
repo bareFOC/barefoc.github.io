@@ -110,11 +110,25 @@ preserve_nvm = true
 #   Whether flashing preserves the application NVM sectors. Default: true.
 #initial_safe_pins = ["!PA9", "^PB12"]
 #   Optional Klipper-style safe startup pins (auto-derived from [gate_driver] if omitted).
+#status_led = "!PA1"
+#   Optional Klipper-style single status LED pin ("!<PIN>" for active-low, "<PIN>" for active-high).
 mailbox_address = 0x20007FE0
 #   SRAM address of the soft-reset / boot-loop mailbox. Default: 0x20007FF8.
 mailbox_magic = 0x5984E3FA6CA1589B
 #   64-bit magic signature requesting bootloader entry. Default: 0x5984E3FA6CA1589B.
 ```
+
+#### Status LED Blink Patterns
+
+When `[bootloader].status_led` is configured, BareBoot drives deterministic single-LED patterns in priority order:
+
+| Priority | State | Condition | Pattern (`ms % 1000`) |
+| --- | --- | --- | --- |
+| 1 | `Flashing` | Active programming (`RX_BLOCK` / `RX_EOF` / `COMPLETE`) | 10 Hz fast blink (50 ms on / 50 ms off) |
+| 2 | `BootLoopError` | Boot-loop trap (`>= 3` fault resets) or flash error | Triple-blink (`0..80`, `160..240`, `320..400` ms) |
+| 3 | `BlankApp` | No valid application vector or CRC32 in flash | Double-blink (`0..100`, `200..300` ms) |
+| 4 | `BootWindow` | Waiting for host activity before auto-booting app | Solid ON |
+| 5 | `Parked` | Valid app present, parked in bootloader mode | 1 Hz heartbeat (500 ms on / 500 ms off) |
 
 ---
 
