@@ -101,8 +101,6 @@ role = "master"
 peripheral = "I2C1"
 tx_scl_pin = "PB6"
 rx_sda_pin = "PB7"
-mux = "tca9548a"
-mux_address = 0x70
 ```
 
 ---
@@ -257,18 +255,18 @@ timer = "TIM1_CH2+TIM3_CH3"
 
 ### `[sensor.<name>]`
 
-Named sensor instances (`[sensor.motor]`, `[sensor.joint]`, `[sensor.ch0]`, `[sensor.ext0]`, etc.) referencing a `[communication.<name>]` bus with `role = "master"` (or inline peripheral/pins). Shared SPI buses require distinct `cs_pin` entries; shared I2C buses require distinct `(address, mux_channel)` pairs; external runtime-selectable connectors declare `supported = [...]` + `default` to emit `SUPPORTED_SENSORS_MASK` and expose `REG_SUPPORTED_SENSORS` over MultiBus.
+Named sensor instances (`[sensor.motor]`, `[sensor.output]`, `[sensor.s0]`, `[sensor.ext0]`, etc.) referencing a `[communication.<name>]` bus with `role = "master"` (or inline peripheral/pins). Shared SPI buses require distinct `cs_pin` entries; shared I2C buses can specify either distinct `(address, mux_channel)` pairs or a `addresses = [...]` candidate list for runtime factory-variant probing (e.g., FishyServo's 3 physical I2C1 connectors with TMAG5273 variants `[0x35, 0x22, 0x78, 0x44]`) with default `motor = 0..3`; external runtime-selectable connectors declare `supported = [...]` + `default` to emit `SUPPORTED_SENSORS_MASK` and expose `REG_SUPPORTED_SENSORS` over MultiBus.
 
 ```toml
-[sensor.ch0]
+[sensor.s0]
 type = "tmag5273"
 #   Fixed sensor type ("tmag5273", "mt6701", "mt6701_ssi", "as5047p", "as5600", "qei", "hall", "virtual").
 bus = "sensor_bus"
 #   References [communication.sensor_bus] (role = "master") or inline peripheral ("SPI2", "I2C1").
-address = 0x35
-#   7-bit I2C sensor address.
-mux_channel = 0
-#   I2C multiplexer channel (0..7).
+addresses = [0x35, 0x22, 0x78, 0x44]
+#   Candidate 7-bit I2C addresses for runtime probing on a shared bus (or `address = 0x35` for a fixed address).
+motor = 0
+#   Default motor channel assignment (overridable at runtime via `REG_SENSOR_MAP` 0x238).
 #cpr = 65536
 #   Counts per revolution (auto-defaulted from sensor type when omitted).
 
