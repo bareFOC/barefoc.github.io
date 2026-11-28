@@ -8,7 +8,7 @@ permalink: /examples/miniata/
 
 # Miniata Reference Example (STM32H503KB)
 
-The Miniata board (`examples/miniata/barefoc.toml`) is the canonical BareFOC reference implementation for high-performance brushless DC (BLDC) Field-Oriented Control (FOC) smart servos, built via the unified `barefoc-firmware` crate. It runs on the [Miniata robotic joint platform](https://github.com/rambros3d/Miniata), combining an STM32H503KBU6 microcontroller with a Texas Instruments DRV8311H 3-phase gate driver, dual absolute magnetic encoders, and compound reduction gearing.
+The Miniata board (`examples/miniata/barefoc.toml`) is the canonical BareFOC reference implementation for high-performance brushless DC (BLDC) Field-Oriented Control (FOC) smart servos, built via the unified `bareFOC` firmware runner crate (`barefoc-firmware`). It runs on the [Miniata robotic joint platform](https://github.com/rambros3d/Miniata), combining an STM32H503KBU6 microcontroller with a Texas Instruments DRV8311H 3-phase gate driver, dual absolute magnetic encoders, and compound reduction gearing.
 
 ---
 
@@ -91,14 +91,14 @@ On cold boot, the firmware inspects Sector 15. If valid, calibration parameters 
 ### Standalone Build (Origin 0x08000000)
 
 ```sh
-cd barefoc-firmware
-BAREFOC_BOARD=../examples/miniata/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5
+cd bareFOC
+BAREFOC_BOARD=examples/miniata/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5
 ```
 
 Flash directly with probe-rs over SWD:
 
 ```sh
-BAREFOC_BOARD=../examples/miniata/barefoc.toml cargo run --release --target thumbv8m.main-none-eabihf --features stm32h5
+BAREFOC_BOARD=examples/miniata/barefoc.toml cargo run --release --target thumbv8m.main-none-eabihf --features stm32h5
 ```
 
 ### Katapult / BareBoot Relocated Build (Origin 0x08002000)
@@ -106,8 +106,8 @@ BAREFOC_BOARD=../examples/miniata/barefoc.toml cargo run --release --target thum
 When operating behind a resident Katapult or BareBoot bootloader occupying sector 0:
 
 ```sh
-cd barefoc-firmware
-BAREFOC_BOARD=../examples/miniata/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
+cd bareFOC
+BAREFOC_BOARD=examples/miniata/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
 ```
 
 Extract the raw binary image:
@@ -115,7 +115,7 @@ Extract the raw binary image:
 ```sh
 arm-none-eabi-objcopy -O binary \
   target/thumbv8m.main-none-eabihf/release/barefoc-firmware \
-  ../examples/miniata/miniata_stm32h5_bootloader.bin
+  examples/miniata/miniata_stm32h5_bootloader.bin
 ```
 
 ---

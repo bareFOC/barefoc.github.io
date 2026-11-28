@@ -8,7 +8,7 @@ permalink: /examples/
 
 # Examples & Reference Designs
 
-BareFOC uses a **TOML-only board architecture**: each board in `examples/` contains only a declarative `barefoc.toml` manifest, and the shared `barefoc-firmware/` crate synthesizes `memory.x`, `$OUT_DIR/bsp_generated.rs`, and compile-time `--cfg` flags directly from `BAREFOC_BOARD`.
+BareFOC uses a **TOML-only board architecture**: each board in `bareFOC/examples/` contains only a declarative `barefoc.toml` manifest, and the shared `bareFOC/` firmware runner crate synthesizes `memory.x`, `$OUT_DIR/bsp_generated.rs`, and compile-time `--cfg` flags directly from `BAREFOC_BOARD`.
 
 ---
 
@@ -31,14 +31,14 @@ BareFOC uses a **TOML-only board architecture**: each board in `examples/` conta
 ## Building Any Board from `barefoc.toml`
 
 ```sh
-cd barefoc-firmware
+cd bareFOC
 
 # FishyServo (STM32H503KB + BareBoot)
-BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
+BAREFOC_BOARD=examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
 
 # MicroSpora (STM32G431CB)
-BAREFOC_BOARD=../examples/microspora/barefoc.toml cargo build --release --target thumbv7em-none-eabihf --features stm32g4
+BAREFOC_BOARD=examples/microspora/barefoc.toml cargo build --release --target thumbv7em-none-eabihf --features stm32g4
 
 # Miniata (STM32H503KB + Katapult/BareBoot)
-BAREFOC_BOARD=../examples/miniata/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
+BAREFOC_BOARD=examples/miniata/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
 ```

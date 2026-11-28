@@ -8,7 +8,7 @@ permalink: /examples/microspora/
 
 # MicroSpora Reference Example (STM32G431CB)
 
-The **MicroSpora** board (`examples/microspora/barefoc.toml`) targets the **officially recommended hardware platform for BareFOC and SimpleFOC**, built via the unified `barefoc-firmware` crate. Designed as a compact, high-performance brushless DC (BLDC) Field-Oriented Control (FOC) driver, MicroSpora pairs an `STM32G431CBU6` microcontroller with a Texas Instruments `DRV8316` 3-phase smart gate driver, an `MT6701` 14-bit magnetic encoder, onboard `FDCAN1` transceiver, and bus voltage sensing.
+The **MicroSpora** board (`examples/microspora/barefoc.toml`) targets the **officially recommended hardware platform for BareFOC and SimpleFOC**, built via the unified `bareFOC` firmware runner crate (`barefoc-firmware`). Designed as a compact, high-performance brushless DC (BLDC) Field-Oriented Control (FOC) driver, MicroSpora pairs an `STM32G431CBU6` microcontroller with a Texas Instruments `DRV8316` 3-phase smart gate driver, an `MT6701` 14-bit magnetic encoder, onboard `FDCAN1` transceiver, and bus voltage sensing.
 
 - **Hardware Design (OSHWLab)**: [Nano-8316 Motor Driver (MicroSpora)](https://oshwlab.com/rambros/nano-8316-motor-driver)
 - **Available for Purchase**: [Makerfabs SimpleFOC MicroSpora](https://www.makerfabs.com/simplefoc-microspora.html)
@@ -51,7 +51,7 @@ flowchart TD
 
 ## Board Manifest (`barefoc.toml`)
 
-`examples/microspora/barefoc.toml` declares the MCU, safety limits, default FOC gains, gate driver, encoder, and CAN connector mapping, and `barefoc-firmware/build.rs` auto-derives `memory.x` and `bsp_generated.rs` directly from it:
+`examples/microspora/barefoc.toml` declares the MCU, safety limits, default FOC gains, gate driver, encoder, and CAN connector mapping, and `bareFOC/build.rs` auto-derives `memory.x` and `bsp_generated.rs` directly from it:
 
 ```toml
 [board]
@@ -128,16 +128,16 @@ cpr = 16384
 ### Check and Build
 
 ```sh
-cd barefoc-firmware
-BAREFOC_BOARD=../examples/microspora/barefoc.toml cargo check --target thumbv7em-none-eabihf --features stm32g4
-BAREFOC_BOARD=../examples/microspora/barefoc.toml cargo build --release --target thumbv7em-none-eabihf --features stm32g4
+cd bareFOC
+BAREFOC_BOARD=examples/microspora/barefoc.toml cargo check --target thumbv7em-none-eabihf --features stm32g4
+BAREFOC_BOARD=examples/microspora/barefoc.toml cargo build --release --target thumbv7em-none-eabihf --features stm32g4
 ```
 
 ### Flash over SWD (`probe-rs`)
 
 ```sh
-cd barefoc-firmware
-BAREFOC_BOARD=../examples/microspora/barefoc.toml cargo run --release --target thumbv7em-none-eabihf --features stm32g4
+cd bareFOC
+BAREFOC_BOARD=examples/microspora/barefoc.toml cargo run --release --target thumbv7em-none-eabihf --features stm32g4
 ```
 
 Or flash the compiled ELF directly:

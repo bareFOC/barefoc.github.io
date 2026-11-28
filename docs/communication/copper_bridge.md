@@ -91,7 +91,7 @@ the number of discovered nodes, produces a typed `BridgeError::Capacity`
 instead of truncation or a panic.
 
 Temperature is read from the canonical stage register `REG_PRESENT_TEMPERATURE`
-(`0x142`, `u16`, whole degrees Celsius) defined in `bareFOC/src/control_table.rs`.
+(`0x142`, `u16`, whole degrees Celsius) defined in `barefoc-core/src/control_table.rs`.
 Unimplemented channels are reported as `NaN`: current sense is gated by
 `CAP_CURRENT_SENSE` (bit 0) and temperature by `CAP_TEMPERATURE` (bit 2) of the
 capability mask at `0x1F8`. A `0xFFFF` temperature sentinel also maps to `NaN`.

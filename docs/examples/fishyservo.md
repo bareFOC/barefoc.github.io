@@ -8,7 +8,7 @@ permalink: /examples/fishyservo/
 
 # FishyServo Reference Example (STM32H503KB)
 
-The FishyServo board (`examples/fishyservo/barefoc.toml`) is the canonical BareFOC reference implementation for 4-axis multi-topology closed-loop brushed DC servo control, built via the unified `barefoc-firmware` crate. It runs on the [FishyServo hardware platform](https://github.com/rambros3d/FishyServo), pairing an STM32H503KBU6 microcontroller with dual Texas Instruments DRV8411A dual H-bridge motor drivers.
+The FishyServo board (`examples/fishyservo/barefoc.toml`) is the canonical BareFOC reference implementation for 4-axis multi-topology closed-loop brushed DC servo control, built via the unified `bareFOC` firmware runner crate (`barefoc-firmware`). It runs on the [FishyServo hardware platform](https://github.com/rambros3d/FishyServo), pairing an STM32H503KBU6 microcontroller with dual Texas Instruments DRV8411A dual H-bridge motor drivers.
 
 ---
 
@@ -97,7 +97,7 @@ The firmware supports zero-touch entry into BareBoot recovery through four indep
 ### Directory Location
 
 ```sh
-cd bareFOC/barefoc-firmware
+cd bareFOC
 ```
 
 ### Standalone Build
@@ -105,13 +105,13 @@ cd bareFOC/barefoc-firmware
 For running directly on bare metal without a bootloader:
 
 ```sh
-BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5
+BAREFOC_BOARD=examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5
 ```
 
 Flash using SWD:
 
 ```sh
-BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo run --release --target thumbv8m.main-none-eabihf --features stm32h5
+BAREFOC_BOARD=examples/fishyservo/barefoc.toml cargo run --release --target thumbv8m.main-none-eabihf --features stm32h5
 ```
 
 ### Bootloader Relocated Build
@@ -119,7 +119,7 @@ BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo run --release --target t
 When deploying via BareBoot (16 KiB bootloader at `0x0800_0000..0x0800_3FFF`, 88 KiB application slot at `0x0800_4000..0x0801_9FFF`):
 
 ```sh
-BAREFOC_BOARD=../examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
+BAREFOC_BOARD=examples/fishyservo/barefoc.toml cargo build --release --target thumbv8m.main-none-eabihf --features stm32h5,bootloader
 ```
 
 Extract the raw binary image:
@@ -127,7 +127,7 @@ Extract the raw binary image:
 ```sh
 arm-none-eabi-objcopy -O binary \
   target/thumbv8m.main-none-eabihf/release/barefoc-firmware \
-  ../examples/fishyservo/fishyservo_stm32h5_i3c.bin
+  examples/fishyservo/fishyservo_stm32h5_i3c.bin
 ```
 
 ---
