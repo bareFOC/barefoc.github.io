@@ -14,44 +14,36 @@ permalink: /tools/bareconfig/
 
 ## 1. Launching bareConfig
 
+### Web Browser (GitHub Pages / WebAssembly)
+Open [https://barefoc.github.io/bareConfig/](https://barefoc.github.io/bareConfig/) directly in any modern browser.
+
 ### Desktop Application
 ```bash
 cd bareFOC/bareConfig
 cargo run --release
 ```
 
-### Web Browser (WebAssembly / WebSerial)
-```bash
-cd bareFOC/bareConfig
-trunk serve --release
-```
-
 ---
 
-## 2. Beginner Mode vs. Advanced Mode
+## 2. Responsive 3-Tab Interface & Themes
 
-`bareConfig` starts in **Beginner Mode** by default to provide a clean, guided zero-to-spin experience:
+`bareConfig` features a minimal, tablet- and laptop-friendly 3-tab top navigation bar:
 
-- **Beginner Mode**:
-  - **Home Hub** shows auto-detected USB adapters and SWD probes alongside board presets discovered dynamically from `bareFOC/examples/*/barefoc.toml` (`miniata`, `fishyservo`, `microspora`, and any custom boards in `./boards/`).
-  - **Guided 5-Step Setup** walks through:
-    1. **Select Board**: Pick your motor controller preset.
-    2. **Connect & Flash**: Choose an auto-detected adapter/probe (or Simulation) and flash firmware.
-    3. **Sensor Check**: Rotate the shaft by hand and verify smooth angle readout.
-    4. **Align & Test Spin**: Run automatic electrical zero alignment and a safe low-speed test spin.
-    5. **Save**: Commit calibration to Sector 15 flash NVM and export tuned settings back to `barefoc.toml`.
-  - Every board card also provides an **Edit TOML** shortcut to inspect or edit the board's `barefoc.toml` directly.
-- **Advanced Mode** (1-click toggle in the top header):
-  - Unlocks the full 5-page **Setup** sidebar (`Board & Pins`, `Host Comm Bus`, `BareBoot Flasher`, `BareFOC Flasher`, `TOML Editor`).
-  - Unlocks all 6 **Motor Workbench** workspaces: **Calibration**, **Oscilloscope**, **Loop Tuning** (cascaded PID diagram), **Vector Scope**, **Control Table** (512-byte canonical hex inspector with search), and **Bus Sniffer**.
+- **Home**: Auto-detected hardware connections, workspace mode switch (**BareFOC** / **BareBOOT**), and a fluid 1–3 column grid of board presets fetched from `bareFOC/examples/*/barefoc.toml` (with **Sync from GitHub**).
+- **Setup**: Unified board configuration and flashing suite (**Board & Pins**, **Host Comm Bus**, **BareBoot Flasher**, **BareFOC Flasher**, and **TOML Editor**).
+- **Workbench**: Real-time motor commissioning (**Calibration**, **Oscilloscope**, **Loop Tuning**, **Vector Scope**, **Control Table**, and **Bus Sniffer**) with a wrapping hero telemetry bar, **Arm/Disarm**, and **Emergency Stop**.
+
+On viewports narrower than `900px` (tablets and small windows down to `480x560`), left sidebars automatically switch to horizontal pill tabs stacked above the content with touch-friendly `34–38px` controls.
+
+Use the header toggle to switch between **DaisyUI Forest** (dark) and **DaisyUI Fantasy** (light) themes.
 
 ---
 
 ## 3. Connecting to Hardware & Programmers
 
-`bareConfig` auto-detects connected host adapters and debug probes on startup (click **Refresh** in the Home Hub to re-scan):
+`bareConfig` auto-detects connected host adapters and debug probes on startup (click **Refresh** in Home to re-scan):
 
-- **USB Serial (UART)**: `/dev/ttyACM*`, `/dev/ttyUSB*` (framed `StreamTransport` at 115200..2000000 baud, default `250000`).
+- **USB Serial (UART)**: `/dev/ttyACM*`, `/dev/ttyUSB*` (framed `StreamTransport` at `115200..2000000` baud, default `250000`).
 - **I2C Bus**: Linux `i2c-dev` (`/dev/i2c-*`) with 16-bit big-endian register pointers.
 - **I3C Bus**: Linux `/dev/i3c-*` devices.
 - **CAN Bus**: Linux SocketCAN (`can*`, `vcan*`).
@@ -60,22 +52,19 @@ trunk serve --release
 
 ---
 
-## 4. On-Disk TOML Editor & Settings Export
+## 4. On-Disk & Browser TOML Editor
 
-Open the **TOML Editor** from any board card (**Edit TOML**) or from the Advanced Setup sidebar:
+Open the **TOML Editor** from any board card (**Edit TOML**) or from **Setup**:
 
-- **Open / Load**, **Save**, **Save As**, and **Quick-Load Board...** operate directly on `barefoc.toml` and `bareboot.toml` files on disk.
+- **Open / Load**, **Save** (downloads `barefoc.toml` in browser WASM builds), **Save As**, and **Quick-Load Board...** operate on `barefoc.toml` and `bareboot.toml`.
 - Validation routes `barefoc.toml` through `parse_barefoc_toml`, automatically inferring MCU flash/RAM layout and PWM timer assignments when `[memory]` or `[timers]` are omitted.
-- Clicking **Save to barefoc.toml** (or **Export Settings to TOML**) reads live PID gains and limits from the connected actuator and updates `[defaults]` in the target `barefoc.toml` file on disk.
+- Exporting live settings reads tuned PID gains and limits from the connected actuator and updates `[defaults]` in `barefoc.toml`.
 
 ---
 
-## 5. Connecting an AI Assistant (MCP)
+## 5. Connecting an AI Assistant (MCP — Desktop Only)
 
-`bareConfig` includes a built-in Model Context Protocol (MCP) server so AI coding assistants (such as Antigravity, Claude Desktop, or Cursor) can connect over `uart`, `i2c`, `i3c`, `can`, `probe-rs`, or `simulated` transports to read telemetry, tune PIDs, inspect canonical control-table registers, validate `barefoc.toml` via `parse_barefoc_toml`, and flash firmware.
-
-- **With the GUI running**: Click **Copy MCP Config** in the header (connects to `http://127.0.0.1:8765/sse`).
-- **Headless CLI mode**: Run `bareconfig --mcp` via stdio.
+On desktop builds, `bareConfig` includes a built-in Model Context Protocol (MCP) server accessible from the **MCP** button in the top bar (HTTP/SSE on `127.0.0.1:8765`) or via headless stdio (`bareconfig --mcp`):
 
 ```json
 {
