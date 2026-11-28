@@ -46,13 +46,13 @@ Defines the board identity and silicon target.
 name = "fishyservo-stm32h5"
 #   Human-readable board identifier. Required.
 description = "FishyServo Quad H-Bridge Multi-Topology Servo (STM32H503KB)"
-#   Short description shown in bareConfig and build metadata. Required.
+#   Short description shown in bareConfig and build metadata. Optional.
 mcu = "stm32h503kbu6"
-#   Target MCU part number (used to auto-derive [memory] layout). Required.
-family = "stm32h5"
-#   HAL family identifier (e.g., "stm32h5", "stm32g4", "stm32f4", "esp32", "ch32"). Required.
-system_clock_hz = 250000000
-#   Core system clock frequency in Hz. Required.
+#   Target MCU part number (used to auto-derive family, system_clock_hz, and [memory]). Required.
+#family = "stm32h5"
+#   HAL family identifier (auto-inferred from mcu when omitted).
+#system_clock_hz = 250000000
+#   Core system clock frequency in Hz (auto-inferred from mcu when omitted).
 ```
 
 ---
@@ -90,35 +90,23 @@ When `[memory]` (or any individual field inside it) is omitted, `MemoryLayout::d
 
 ### `[communication.<name>]` *(optional)*
 
-Semantic named communication ports (`[communication.host]`, `[communication.sensor_bus]`, `[communication.encoder_bus]`, etc.) with explicit `role` (`"target"`, `"master"`, `"both"`), `bootloader` flag, optional `peripheral` disambiguator, and optional I2C `mux` / `mux_address`. Pin assignments support Klipper-style `!`/`^`/`~` modifiers, and schema validation rejects any GPIO pin conflicts across active ports. Shared identically with `bareboot.toml`.
+Semantic named communication ports (`[communication.i3c2]`, `[communication.i2c1]`, `[communication.uart1]`, `[communication.fdcan1]`, `[communication.spi1]`, etc.). Both `protocol` and numbered `peripheral` are automatically inferred from the section key prefix (`i3c*`, `i2c*`, `uart*`/`usart*`, `spi*`, `can*`/`fdcan*`) when omitted. Uses protocol-native pin names (`scl_pin`/`sda_pin` for I2C/I3C, `tx_pin`/`rx_pin` for UART/CAN, `sck_pin`/`miso_pin`/`mosi_pin` for SPI) with Klipper-style `!`/`^`/`~` modifiers. Shared identically with `bareboot.toml`.
 
 ```toml
-[communication.host]
-protocol = "i3c"
-#   Transport protocol: "i3c", "i2c", "spi", "can", "uart", "usb", or "rtt".
-role = "target"
-#   Port role: "target" (host-facing), "master" (downstream sensors/drivers), or "both".
+[communication.i3c2]
+#   Infers protocol = "i3c", peripheral = "I3C2", role = "target".
 bootloader = true
 #   Allow bootloader access on this port (valid only when role is "target" or "both").
-peripheral = "I3C1"
-#   Optional MCU peripheral disambiguator ("I3C1", "FDCAN1", "USART1", "I2C1", "SPI1").
-tx_scl_pin = "PB3"
-#   TX / SCL / CAN_TX pin.
-rx_sda_pin = "PB4"
-#   RX / SDA / CAN_RX pin.
-#can_enable_pin = "PC13"
-#   Optional CAN transceiver enable pin.
+scl_pin = "PB3"
+sda_pin = "PB4"
 bitrate = 1000000
-#   Required for async "uart" / "can"; optional host hint for "i3c" / "i2c" / "spi".
 address = 0x40
-#   Static/proposed 7-bit I2C or I3C target address. Optional.
 
-[communication.sensor_bus]
-protocol = "i2c"
+[communication.i2c1]
+#   Infers protocol = "i2c", peripheral = "I2C1".
 role = "master"
-peripheral = "I2C1"
-tx_scl_pin = "PB6"
-rx_sda_pin = "PB7"
+scl_pin = "PB6"
+sda_pin = "PB7"
 ```
 
 ---
@@ -232,41 +220,25 @@ lpf_angle_tf = 0.0
 
 ---
 
-### `[gate_driver]` and `[[gate_driver.channels]]`
+### `[gate_driver]` and `[gate_driver.<name>]`
 
-Defines the power stage topology, PWM frequency, and per-channel bridge pins. All pin fields support Klipper-style modifiers (`!` inverted/active-low, `^` pull-up, `~` pull-down, e.g. `fault_pin = "^!PB12"`, `cs_pin = "!PC4"`).
+Defines the power stage topology (`"h_bridge"` or `"half_bridge"`), optional IC `type` (default `"generic"`), default PWM frequency (`pwm_frequency_hz = 24000`, also runtime-configurable while disarmed via `REG_PWM_FREQUENCY_HZ` at `0x5C`), parallel drive pin arrays, and inline current-sense configuration. PWM timers and channels are automatically assigned at compile time from the MCU pin-AF table (including GPIO `DIR` detection such as `PA15` on FishyServo).
 
-When `[[gate_driver.channels]]` is populated (e.g. 4-channel H-bridge boards), `inh_a`, `inh_b`, and `inh_c` are optional and do not need dummy placeholders.
+- **Complementary 6-PWM (`half_bridge`) or 2-PWM (`h_bridge`)**: `high_pwm_pin = [...]`, `low_pwm_pin = [...]`
+- **3-PWM + GPIO Enable (`half_bridge`)**: `pwm_pin = [...]`, `en_pin = [...]`
+- **Sign-Magnitude (`h_bridge`)**: `pwm_pin = [...]`, `dir_pin = [...]`
+- **Current Sensing**: `current_sense = "lowside" | "highside" | "inline" | "none"` (defaults to `"lowside"` when `current_adc_pin` is non-empty), `current_adc_pin = [...]`, `csa_gain`, `ripropi_ohms`, `shunt_ohms`.
 
 ```toml
 [gate_driver]
-driver_type = "drv8411a"
-#   Gate driver IC ("drv8411a", "drv8311", "drv8316", "3pwm", "6pwm", etc.). Required.
-pwm_frequency_hz = 25000
-#   PWM carrier frequency in Hz. Required.
-pwm_timer = "TIM1+TIM3"
-#   MCU timer peripheral(s) driving PWM outputs. Required.
-#inh_a = "PA10"
-#inh_b = "PA9"
-#inh_c = "PA8"
-#   Primary phase / high-side PWM pins (required when [[gate_driver.channels]] is empty).
-#inl_a = "PB15"
-#inl_b = "PB14"
-#inl_c = "PB13"
-#   Complementary / low-side or enable pins. Optional.
-sleep_pin = "PA9"
-#   Sleep / driver enable GPIO pin. Optional.
-#fault_pin = "^!PB12"
-#   Hardware nFAULT input pin (supports ^ pull-up and ! inverted). Optional.
-
-[[gate_driver.channels]]
-#   Optional per-channel H-bridge / half-bridge descriptors for multi-axis boards.
-channel = 0
-bridge = "D"
-in1_pin = "PA9"
-in2_pin = "PB0"
-adc_pin = "PA5"
-timer = "TIM1_CH2+TIM3_CH3"
+type = "drv8411a"
+topology = "h_bridge"
+#pwm_frequency_hz = 24000
+high_pwm_pin = ["PA9", "PA8", "PA6", "PA15"]
+low_pwm_pin = ["PB0", "PB15", "PA7", "PB5"]
+current_sense = "lowside"
+current_adc_pin = ["PA5", "PA3", "PA4", "PA2"]
+ripropi_ohms = 1000.0
 ```
 
 ---
