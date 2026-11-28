@@ -61,13 +61,23 @@ mcu = "stm32g431cbu6"
 family = "stm32g4"
 system_clock_hz = 170000000
 
-[communication]
-transports = ["can"]
-bus = "FDCAN1"
+[communication.host]
+protocol = "can"
+role = "target"
+bootloader = false
+peripheral = "FDCAN1"
 tx_scl_pin = "PB9"
 rx_sda_pin = "PB8"
 can_enable_pin = "PC13"
 bitrate = 1000000
+
+[communication.encoder_bus]
+protocol = "spi"
+role = "master"
+peripheral = "SPI1"
+sck_pin = "PA5"
+miso_pin = "PA6"
+mosi_pin = "PA7"
 
 [bootloader]
 enabled = false
@@ -79,9 +89,14 @@ preserve_nvm = true
 max_voltage_v = 24.0
 max_current_a = 8.0
 max_velocity_rad_s = 100.0
-thermal_cutoff_c = 85.0
-default_voltage_limit = 6.0
-default_current_limit = 2.0
+temp_limit_mosfet_c = 85.0
+
+[defaults]
+node_id = 1
+pole_pairs = 7
+voltage_limit = 6.0
+current_limit = 2.0
+velocity_limit = 50.0
 
 [gate_driver]
 driver_type = "drv8316"
@@ -99,13 +114,10 @@ spi_sck_pin = "PB3"
 spi_mosi_pin = "PB5"
 spi_miso_pin = "PB4"
 
-[sensor]
-sensor_type = "mt6701"
-bus = "SPI1"
+[sensor.motor]
+type = "mt6701"
+bus = "encoder_bus"
 cs_pin = "!PA4"
-clk_pin = "PA5"
-data_pin = "PA6"
-mosi_pin = "PA7"
 cpr = 16384
 ```
 

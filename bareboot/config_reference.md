@@ -66,21 +66,24 @@ page_size = 8192
 
 ---
 
-## `[communication]`
+## `[communication.<name>]`
 
-Configures bootloader transport(s), bus pins, bitrate, and target address:
+Configures semantic bootloader transport ports, bus pins, bitrate, and target address. Any port with `bootloader = true` (valid only for `role = "target"` or `"both"`) is active in BareBoot. When 2 or more distinct-pin ports have `bootloader = true`, `bareboot-engine` automatically enables `MultiTransportArbiter`:
 
 ```toml
-[communication]
-transports = ["i3c", "i2c"]
-#   Enabled bootloader transports ("i3c", "i2c", "can", "uart", "usb", "multi").
-#transport = "i3c"
-#   Optional single primary transport override.
-#tx_scl_pin = "PB3"
-#rx_sda_pin = "PB4"
-#can_enable_pin = "PC13"
+[communication.host]
+protocol = "i3c"
+#   Transport protocol ("i3c", "i2c", "can", "uart", "usb", "rtt").
+role = "target"
+#   Must be "target" or "both" when bootloader = true.
+bootloader = true
+#   Enable bootloader listener on this port.
+peripheral = "I3C1"
+#   Optional MCU peripheral disambiguator.
+tx_scl_pin = "PB3"
+rx_sda_pin = "PB4"
 bitrate = 1000000
-#   Bus bitrate in bps (e.g., 1000000 = 1 MHz CAN/I3C, 250000 = UART). Optional.
+#   Required for async "uart" / "can"; optional host hint for "i3c" / "i2c".
 address = 0x40
 #   7-bit I2C/I3C target address (or proposed ENTDAA address). Optional.
 ```

@@ -70,26 +70,39 @@ When `[memory]` (or any individual field inside it) is omitted, `MemoryLayout::d
 
 ---
 
-### `[communication]` *(optional)*
+### `[communication.<name>]` *(optional)*
 
-Host-facing communication bus, pin assignments (with optional Klipper-style `!`/`^`/`~` modifiers), bitrate, and target address. Shared identically with `bareboot.toml`.
+Semantic named communication ports (`[communication.host]`, `[communication.sensor_bus]`, `[communication.encoder_bus]`, etc.) with explicit `role` (`"target"`, `"master"`, `"both"`), `bootloader` flag, optional `peripheral` disambiguator, and optional I2C `mux` / `mux_address`. Pin assignments support Klipper-style `!`/`^`/`~` modifiers, and schema validation rejects any GPIO pin conflicts across active ports. Shared identically with `bareboot.toml`.
 
 ```toml
-[communication]
-transports = ["i3c", "i2c"]
-#   Enabled communication transports ("i3c", "i2c", "uart", "can", "usb").
-bus = "I3C1"
-#   MCU peripheral name ("I3C1", "FDCAN1", "USART1", "I2C1"). Optional.
+[communication.host]
+protocol = "i3c"
+#   Transport protocol: "i3c", "i2c", "spi", "can", "uart", "usb", or "rtt".
+role = "target"
+#   Port role: "target" (host-facing), "master" (downstream sensors/drivers), or "both".
+bootloader = true
+#   Allow bootloader access on this port (valid only when role is "target" or "both").
+peripheral = "I3C1"
+#   Optional MCU peripheral disambiguator ("I3C1", "FDCAN1", "USART1", "I2C1", "SPI1").
 tx_scl_pin = "PB3"
-#   TX / SCL / CAN_TX pin. Optional.
+#   TX / SCL / CAN_TX pin.
 rx_sda_pin = "PB4"
-#   RX / SDA / CAN_RX pin. Optional.
+#   RX / SDA / CAN_RX pin.
 #can_enable_pin = "PC13"
 #   Optional CAN transceiver enable pin.
 bitrate = 1000000
-#   Default bus bitrate in bps (e.g., 1000000 = 1 MHz I3C SDR / 1 Mbps CAN). Default: 250000.
+#   Required for async "uart" / "can"; optional host hint for "i3c" / "i2c" / "spi".
 address = 0x40
 #   Static/proposed 7-bit I2C or I3C target address. Optional.
+
+[communication.sensor_bus]
+protocol = "i2c"
+role = "master"
+peripheral = "I2C1"
+tx_scl_pin = "PB6"
+rx_sda_pin = "PB7"
+mux = "tca9548a"
+mux_address = 0x70
 ```
 
 ---
@@ -134,29 +147,40 @@ When `[bootloader].status_led` is configured, BareBoot drives deterministic sing
 
 ### `[safety]`
 
-Hardware protection limits enforced by the FOC safety supervisor.
+Hard PCB protection ceilings and fault trip thresholds enforced by the FOC safety supervisor.
 
 ```toml
 [safety]
 max_voltage_v = 6.0
-#   Hard maximum bus/phase voltage clamp in Volts. Required.
+#   Hard maximum bus/phase voltage ceiling in Volts. Required.
+#min_bus_voltage_v = 4.0
+#   Optional under-voltage lockout threshold in Volts.
 max_current_a = 2.0
-#   Hard maximum phase/bus current limit in Amperes. Required.
+#   Hard maximum phase/bus current ceiling in Amperes. Required.
+#continuous_current_a = 1.5
+#   Optional continuous RMS current rating in Amperes (<= max_current_a).
+#i2t_limit = 10.0
+#   Optional I2t thermal integration limit.
 max_velocity_rad_s = 50.0
 #   Maximum allowed angular velocity in rad/s. Required.
-thermal_cutoff_c = 85.0
-#   Over-temperature shutdown threshold in degrees Celsius. Optional.
-default_voltage_limit = 5.0
-#   Initial runtime voltage limit in Volts. Required.
-default_current_limit = 1.0
-#   Initial runtime current limit in Amperes. Required.
+temp_limit_mosfet_c = 85.0
+#   MOSFET over-temperature shutdown threshold in degrees Celsius. Optional.
+#temp_limit_mcu_c = 105.0
+#   Optional MCU die temperature shutdown threshold in degrees Celsius.
+#temp_limit_motor_c = 100.0
+#   Optional motor winding temperature shutdown threshold in degrees Celsius.
+#stall_timeout_ms = 500
+#comm_timeout_ms = 250
+#runaway_timeout_ms = 200
+#max_angle_jump_rad = 1.0
+#max_enable_step_rad = 0.5
 ```
 
 ---
 
 ### `[defaults]` *(optional — factory fallback)*
 
-Factory defaults used **only** when NVM (Bank 2 Sectors 14 & 15) is blank or invalid. Once commissioned over I3C (`SaveConfig`), persisted NVM values override these defaults on every boot.
+Initial runtime operating limits (`voltage_limit <= safety.max_voltage_v`, `current_limit <= safety.max_current_a`, `velocity_limit <= safety.max_velocity_rad_s`), PID gains, and filter constants used when NVM is blank or invalid.
 
 ```toml
 [defaults]
@@ -164,12 +188,12 @@ node_id = 64
 #   Default 7-bit bus node ID. Default: 1.
 pole_pairs = 1
 #   Motor electrical pole pairs. Default: 7.
-topology = "four_1dof"
-#   Multi-axis actuator topology: "four_1dof", "two_2dof",
-#   "one_1dof_one_2dof", "two_1dof_one_2dof", or "custom". Default: "four_1dof".
-sensor_map = [0, 1, 2, 3]
-#   4-element mapping from motor channel index [0..3] to sensor channel index.
-#   Default: [0, 1, 2, 3].
+voltage_limit = 5.0
+#   Initial runtime voltage limit in Volts (<= safety.max_voltage_v).
+current_limit = 1.0
+#   Initial runtime current limit in Amperes (<= safety.max_current_a).
+velocity_limit = 50.0
+#   Initial runtime velocity limit in rad/s (<= safety.max_velocity_rad_s).
 pid_velocity_p = 0.5
 #   Velocity PID proportional gain. Default: 0.25.
 pid_velocity_i = 1.0
@@ -188,12 +212,6 @@ lpf_velocity_tf = 0.02
 #   Velocity low-pass filter time constant in seconds. Default: 0.015.
 lpf_angle_tf = 0.0
 #   Angle low-pass filter time constant in seconds. Default: 0.0.
-gear_ratio = 1.0
-#   Default mechanical reduction ratio (motor_rad / joint_rad). Default: 1.0.
-#soft_limit_min_rad = -3.14159
-#   Optional minimum software position limit in radians.
-#soft_limit_max_rad = 3.14159
-#   Optional maximum software position limit in radians.
 ```
 
 ---
@@ -237,33 +255,29 @@ timer = "TIM1_CH2+TIM3_CH3"
 
 ---
 
-### `[sensor]` and `[[sensor.channels]]`
+### `[sensor.<name>]`
 
-Defines the primary feedback sensor bus and per-channel sensor addresses or mux slots.
+Named sensor instances (`[sensor.motor]`, `[sensor.joint]`, `[sensor.ch0]`, `[sensor.ext0]`, etc.) referencing a `[communication.<name>]` bus with `role = "master"` (or inline peripheral/pins). Shared SPI buses require distinct `cs_pin` entries; shared I2C buses require distinct `(address, mux_channel)` pairs; external runtime-selectable connectors declare `supported = [...]` + `default` to emit `SUPPORTED_SENSORS_MASK` and expose `REG_SUPPORTED_SENSORS` over MultiBus.
 
 ```toml
-[sensor]
-sensor_type = "tmag5273"
-#   Position sensor type ("tmag5273", "mt6701", "as5600", "as5048a", "abi", etc.). Required.
-bus = "I2C1"
-#   MCU bus peripheral ("I2C1", "SPI2", etc.). Required.
-#cs_pin = "!PA4"
-#   SPI chip-select pin (for SPI sensors). Optional.
-clk_pin = "PB6"
-#   SCL / SCK pin name. Optional.
-data_pin = "PB7"
-#   SDA / MISO pin name. Optional.
-#mosi_pin = "PA7"
-#   MOSI pin name (for SPI sensors). Optional.
-cpr = 65536
-#   Counts per revolution (e.g., 65536 for 16-bit, 16384 for 14-bit). Required.
-
-[[sensor.channels]]
-#   Optional per-channel sensor descriptors for multi-axis boards.
-channel = 0
-bus = "I2C1"
+[sensor.ch0]
+type = "tmag5273"
+#   Fixed sensor type ("tmag5273", "mt6701", "mt6701_ssi", "as5047p", "as5600", "qei", "hall", "virtual").
+bus = "sensor_bus"
+#   References [communication.sensor_bus] (role = "master") or inline peripheral ("SPI2", "I2C1").
 address = 0x35
+#   7-bit I2C sensor address.
 mux_channel = 0
+#   I2C multiplexer channel (0..7).
+#cpr = 65536
+#   Counts per revolution (auto-defaulted from sensor type when omitted).
+
+# Example runtime-selectable external sensor connector:
+#[sensor.ext0]
+#default = "mt6701"
+#supported = ["mt6701", "as5047p", "virtual"]
+#bus = "encoder_bus"
+#cs_pin = "!PA4"
 ```
 
 ---
