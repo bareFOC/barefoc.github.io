@@ -25,17 +25,20 @@ cargo run --release
 
 ---
 
-## 2. Responsive 3-Tab Interface & Themes
+## 2. Responsive Top Bar & Navigation
 
-`bareConfig` features a minimal, tablet- and laptop-friendly 3-tab top navigation bar:
+`bareConfig` uses a minimal top navigation bar that adapts cleanly to tablets, small laptops, and wide desktops:
 
-- **Home**: Auto-detected hardware connections, workspace mode switch (**BareFOC** / **BareBOOT**), and a fluid 1–3 column grid of board presets fetched from `bareFOC/examples/*/barefoc.toml` (with **Sync from GitHub**).
-- **Setup**: Unified board configuration and flashing suite (**Board & Pins**, **Host Comm Bus**, **BareBoot Flasher**, **BareFOC Flasher**, and **TOML Editor**).
-- **Workbench**: Real-time motor commissioning (**Calibration**, **Oscilloscope**, **Loop Tuning**, **Vector Scope**, **Control Table**, and **Bus Sniffer**) with a wrapping hero telemetry bar, **Arm/Disarm**, and **Emergency Stop**.
+- **Home**: Auto-detected hardware connections, **New Board** modal (choose **BareFOC (`barefoc.toml`)** or **BareBOOT (`bareboot.toml`)**), and a fluid 1–3 column grid of board presets fetched from `bareFOC/examples/*/barefoc.toml` (with **Sync from GitHub**).
+- **Setup**: Automatically detects **BareFOC Setup** vs **BareBOOT Setup** from the active TOML and shares one **Active Target Header** across 3 unified tabs:
+  1. **Overview & Bus**: Hardware pinout, live `parse_barefoc_toml` / `parse_bareboot_toml` validation, auto-populated host bus parameters, and **Apply & Connect**.
+  2. **Flash**: Unified **BareFOC App** and **BareBoot / Katapult Bootloader** deployment with a single programmer/bus selector (`probe-rs SWD`, `UART`, `I2C/I3C`, `CAN`), shared **Preserve Calibration (NVM)** toggle, and shared log console.
+  3. **TOML Editor**: On-disk / browser TOML editor whose edits sync immediately back to **Overview & Bus** and **Flash**.
+- **Workbench**: Appears **only** when connected to a verified BareFOC firmware node (`model_number != 0`), providing **Calibration**, **Oscilloscope**, **Loop Tuning**, **Vector Scope**, **Control Table**, and **Bus Sniffer**.
 
-On viewports narrower than `900px` (tablets and small windows down to `480x560`), left sidebars automatically switch to horizontal pill tabs stacked above the content with touch-friendly `34–38px` controls.
+On viewports narrower than `900px` (down to `480x560`), left sidebars automatically switch to horizontal pill tabs stacked above the content with touch-friendly `34–38px` controls.
 
-Use the header toggle to switch between **DaisyUI Forest** (dark) and **DaisyUI Fantasy** (light) themes.
+The top-right utility bar provides a **GitHub** link button and an icon-only **Theme** toggle cycling **System** (default) -> **Dark (Forest)** -> **Light (Fantasy)**.
 
 ---
 
@@ -52,17 +55,7 @@ Use the header toggle to switch between **DaisyUI Forest** (dark) and **DaisyUI 
 
 ---
 
-## 4. On-Disk & Browser TOML Editor
-
-Open the **TOML Editor** from any board card (**Edit TOML**) or from **Setup**:
-
-- **Open / Load**, **Save** (downloads `barefoc.toml` in browser WASM builds), **Save As**, and **Quick-Load Board...** operate on `barefoc.toml` and `bareboot.toml`.
-- Validation routes `barefoc.toml` through `parse_barefoc_toml`, automatically inferring MCU flash/RAM layout and PWM timer assignments when `[memory]` or `[timers]` are omitted.
-- Exporting live settings reads tuned PID gains and limits from the connected actuator and updates `[defaults]` in `barefoc.toml`.
-
----
-
-## 5. Connecting an AI Assistant (MCP — Desktop Only)
+## 4. Connecting an AI Assistant (MCP — Desktop Only)
 
 On desktop builds, `bareConfig` includes a built-in Model Context Protocol (MCP) server accessible from the **MCP** button in the top bar (HTTP/SSE on `127.0.0.1:8765`) or via headless stdio (`bareconfig --mcp`):
 
