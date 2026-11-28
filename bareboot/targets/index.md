@@ -18,7 +18,7 @@ BareBoot provides optimized, hardware-specific bootloader builds tailored to spe
 
 | Target MCU | Architecture | Flash Size | Bootloader Slot | User App Base | Primary Bus Transports |
 |---|---|---|---|---|---|
-| [**STM32H503**](/bareboot/targets/stm32h5/) | ARM Cortex-M33 (250 MHz) | 128 KB (16 sectors x 8 KB) | `0x08000000` (8 KB) | `0x08002000` (Sector 1) | I2C, MIPI I3C, UART |
+| [**STM32H503**](/bareboot/targets/stm32h5/) | ARM Cortex-M33 (250 MHz) | 128 KB (16 sectors x 8 KB) | `0x08000000` (16 KB) | `0x08004000` (Sector 2) | I2C, MIPI I3C, UART |
 | [**RP2350 / RP2040**](/bareboot/targets/rp2350/) | Dual ARM Cortex-M33 / Hazard3 | 2 MB – 16 MB External XIP | `0x10000000` (288 KB) | `0x10048000` (App Slot) | USB CDC, UART, SWD Mailbox |
 | **STM32F103** | ARM Cortex-M3 (72 MHz) | 64 KB – 128 KB (1 KB/2 KB pages) | `0x08000000` (4 KB – 8 KB) | `0x08002000` | Classic bxCAN, UART |
 | **STM32G0B1** | ARM Cortex-M0+ (64 MHz) | 128 KB – 512 KB (2 KB pages) | `0x08000000` (8 KB) | `0x08002000` | FDCAN, UART, USB |

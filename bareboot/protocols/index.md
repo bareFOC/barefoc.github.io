@@ -10,7 +10,7 @@ description: "Wire framing, opcodes, CRC verification, and physical transports s
 
 # Protocols & Transports
 
-BareBoot implements a lean, packet-oriented command protocol derived from Katapult, supporting multiple physical physical transport layers.
+BareBoot implements a lean, packet-oriented command protocol derived from Katapult, supporting multiple physical transport layers.
 
 ---
 

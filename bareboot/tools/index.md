@@ -17,4 +17,4 @@ BareBoot provides both a graphical workbench and command-line utilities for boot
 ## Available Tools
 
 - [**GUI Workbench & bareConfig Flasher**](/bareboot/tools/tui/): Unified graphical flasher, `bareboot-engine` pipeline, and `bareConfig` integration.
-- [**Host Flashtool Reference**](/bareboot/tools/flashtool/): Command-line flashing reference for `bareboot-cli` and `flash_app_over_i3c_usb.py` across I3C, I2C, UART, and USB.
+- [**Host Flashtool Reference**](/bareboot/tools/flashtool/): Command-line flashing reference for `bareboot-cli` and `multidrop_flashtool.py` across I3C, I2C, UART, and USB.

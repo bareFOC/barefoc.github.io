@@ -217,13 +217,13 @@ pub unsafe fn enter_bareboot_ch32v(sram_top: u32) -> ! {
 
 ## 6. Multi-Drop Bus Topology Architecture
 
-In multi-actuator robotics, robotic hands, and multi-joint industrial arms, multiple BareBoot slave nodes share a common communication bus (e.g. I2C or I3C lines driven by an AgentLA host gateway).
+In multi-actuator robotics, robotic hands, and multi-joint industrial arms, multiple BareBoot target nodes share a common communication bus (e.g., I2C or I3C lines driven by a Host Controller / Bus Adapter).
 
 ```mermaid
 flowchart TD
-    Host["Host Gateway (AgentLA / Linux Controller)"]
-    SCL["Clock: SCL (GP11 / PB3)"]
-    SDA["Data: SDA (GP10 / PB4)"]
+    Host["Host Controller / Bus Adapter"]
+    SCL["Clock: SCL"]
+    SDA["Data: SDA"]
 
     Host --- SCL
     Host --- SDA
