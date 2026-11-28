@@ -17,6 +17,24 @@ This document is a reference for all TOML configuration sections used in BareFOC
 
 ---
 
+## Compile-Time BSP Codegen (`bareFOC/build.rs`)
+
+When building the `bareFOC` firmware runner, `bareFOC/build.rs` reads the manifest specified by `BAREFOC_BOARD` (defaulting to `examples/microspora/barefoc.toml`) via `bareconfig::bsp::schema::parse_barefoc_toml()` and generates three compile-time artifacts:
+
+1. **`$OUT_DIR/memory.x`**: Linker script with `FLASH`, `RAM`, and NVM sector bounds derived from `[board]` and `[memory]` (using `flash_origin` for standalone builds or `app_origin` when `bootloader = true` or `--features bootloader`).
+2. **`$OUT_DIR/bsp_generated.rs`**: Included as `crate::bsp` in `bareFOC/src/main.rs`, containing:
+   - Board, memory, bootloader, safety, defaults, gate-driver, communication, and sensor constants (`BOARD_NAME`, `SYSTEM_CLOCK_HZ`, `APP_ORIGIN`, `NVM_SECTOR_ORIGIN`, `POLE_PAIRS`, `PWM_FREQUENCY_HZ`, `COMM_BITRATE`, `SUPPORTED_SENSORS_MASK`, etc.).
+   - Typed `embassy_bsp` bindings (`CommIrqs`, `take_comm_peripherals!`, `take_gate_driver_peripherals!`, `take_sensor_peripherals!`, `SharedSpiCsPins`).
+   - `create_default_control_table()` initializing the 512-byte control table with factory defaults from `barefoc.toml`.
+3. **Capability `--cfg` Flags**: Emitted to `rustc` so `bareFOC/src/runners/` selects generic motor, sensor, and transport runners with **zero per-board `.rs` files**:
+   - **MCU**: `mcu_stm32h503cb`, `mcu_stm32g431cb`
+   - **Bootloader**: `has_bootloader`
+   - **Communication**: `bus_i3c`, `bus_i2c`, `bus_uart`, `bus_can`
+   - **Gate Driver**: `drv_drv8411a`, `drv_drv8316`, `drv_drv8311`
+   - **Sensor**: `sensor_tmag5273`, `sensor_mt6701`
+
+---
+
 ## Board Hardware Sections (`barefoc.toml`)
 
 ### `[board]`

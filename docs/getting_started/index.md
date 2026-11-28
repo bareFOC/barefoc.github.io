@@ -8,7 +8,12 @@ permalink: /getting_started/
 
 # Getting Started with BareFOC
 
-BareFOC is an embedded Rust library providing real-time Field Oriented Control (FOC) for Brushless DC (BLDC), Stepper, and brushed DC motors. It targets `#![no_std]` microcontrollers across ARM Cortex-M (STM32), RISC-V (CH32), and Xtensa/ESP32 architectures.
+BareFOC provides both a **TOML-driven firmware runner (`bareFOC`)** for zero-code board bring-up and a **`#![no_std]` Rust FOC library (`barefoc-core`, crate name `barefoc`)** for custom firmware. It targets ARM Cortex-M (STM32), RISC-V (CH32), and Xtensa/ESP32 architectures.
+
+### Two Ways to Use BareFOC
+
+1. **TOML-Driven Firmware Runner (`bareFOC`)**: Define your board in `barefoc.toml` and build with `BAREFOC_BOARD=...`. At compile time, `bareFOC/build.rs` runs `bareConfig` codegen to synthesize `memory.x`, `$OUT_DIR/bsp_generated.rs`, and capability `--cfg` flags, then dispatches to generic capability-driven runners in `bareFOC/src/runners/` with zero per-board `.rs` files.
+2. **Core Library (`barefoc-core` / `barefoc` crate)**: Import `barefoc` alongside `barefoc-drivers`, `barefoc-comms`, and `barefoc-hal` in your own Rust firmware crate.
 
 ---
 

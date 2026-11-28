@@ -14,7 +14,8 @@ BareFOC is an open-source project developed for the embedded Rust and motor cont
 
 ## GitHub Issues & Discussions
 
-- **Repository**: [https://github.com/bareFOC/bareFOC](https://github.com/bareFOC/bareFOC)
+- **Firmware Runner & Examples**: [https://github.com/bareFOC/bareFOC](https://github.com/bareFOC/bareFOC)
+- **Core Library (`barefoc` crate)**: [https://github.com/bareFOC/barefoc-core](https://github.com/bareFOC/barefoc-core)
 - **Bug Reports & Feature Requests**: Submit issues via the [GitHub Issue Tracker](https://github.com/bareFOC/bareFOC/issues).
 - **Discussions**: Architectural proposals, questions, and hardware showcase in [GitHub Discussions](https://github.com/bareFOC/bareFOC/discussions).
 

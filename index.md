@@ -43,22 +43,27 @@ The BareFOC project is organized as a modular workspace of focused crates:
 
 ```mermaid
 graph TD
-    subgraph App ["Application & High-Level Control"]
-        COM["barefoc-comms<br/>Commander • Fibre RPC • Multibus • CAN • RTT"]
-        KIN["bareFOC::kinematics<br/>Transmissions • Joint Kinematics • Trajectory Profiling"]
-        TABLE["bareFOC::control_table<br/>Universal 384-Byte Control Table • EEPROM/RAM Partitioning"]
+    subgraph Firmware ["bareFOC (TOML-Driven Firmware Runner)"]
+        RUNNER["bareFOC/src/runners/<br/>Capability-Driven Runners (bldc_foc_3pwm • bldc_foc_6pwm • dc_quad)"]
+        CODEGEN["bareConfig BSP Codegen<br/>barefoc.toml -> memory.x • bsp_generated.rs • --cfg flags"]
     end
 
-    subgraph Core ["bareFOC (Core Engine — #![no_std])"]
-        MOTOR["bareFOC::motor<br/>BLDCMotor • StepperMotor • Hybrid • DCMotor"]
-        MATH["bareFOC::math<br/>Clarke • Park • SVPWM • SinePWM"]
-        COMMON["bareFOC::common<br/>PIDController • LowPassFilter • Clock"]
-        TRAITS["bareFOC::traits<br/>FOCMotor • BLDCDriver • Sensor • CurrentSense • Storage • Bootloader"]
+    subgraph App ["Application & High-Level Control"]
+        COM["barefoc-comms<br/>Commander • Fibre RPC • Multibus • CAN • RTT"]
+        KIN["barefoc::kinematics<br/>Transmissions • Joint Kinematics • Trajectory Profiling"]
+        TABLE["barefoc::control_table<br/>Universal 512-Byte Control Table • EEPROM/RAM Partitioning"]
+    end
+
+    subgraph Core ["barefoc-core (crate: barefoc — #![no_std])"]
+        MOTOR["barefoc::motor<br/>BLDCMotor • StepperMotor • Hybrid • DCMotor"]
+        MATH["barefoc::math<br/>Clarke • Park • SVPWM • SinePWM"]
+        COMMON["barefoc::common<br/>PIDController • LowPassFilter • Clock"]
+        TRAITS["barefoc::traits<br/>FOCMotor • BLDCDriver • Sensor • CurrentSense • Storage • Bootloader"]
     end
 
     subgraph Drivers ["barefoc-drivers"]
         SENS["Sensors<br/>MT6701 • AS5048 • AS5600 • TMAG5273 • Hall"]
-        GATE["Gate Drivers<br/>DRV8316 • DRV8311 • L6234 • 6PWM • 3PWM"]
+        GATE["Gate Drivers<br/>DRV8316 • DRV8311 • DRV8411A • 6PWM • 3PWM"]
     end
 
     subgraph Target ["Hardware Targets & SIL Simulation"]
@@ -66,6 +71,9 @@ graph TD
         SIM["barefoc-sim<br/>Coupled ODE Physics • Sub-stepped SIL"]
     end
 
+    CODEGEN --> RUNNER
+    RUNNER --> COM
+    RUNNER --> MOTOR
     COM --> MOTOR
     KIN --> MOTOR
     TABLE --> MOTOR
@@ -82,12 +90,13 @@ graph TD
 
 | Component | Responsibility | Key Types & Features |
 |---|---|---|
-| **`bareFOC::math`** | Coordinate transforms & modulation | Forward/Inverse Clarke, Forward/Inverse Park, Space Vector PWM (SVPWM), Sine PWM, Trapezoidal modulation |
-| **`bareFOC::common`** | Discrete-time signal conditioning | `PIDController` (anti-windup, ramp limit, derivative filter), `LowPassFilter`, monotonic `Clock` |
-| **`bareFOC::motor`** | Actuator state machines | `BLDCMotor`, `StepperMotor`, `HybridStepperMotor`, `DCMotor`, open/closed-loop velocity and angle control |
-| **`bareFOC::control_table`**| Universal actuator register map | Standardized 384-byte Control Table (224-byte EEPROM + 160-byte RAM), 4-axis motor bank, 8 operating modes, kinematics topology presets, soft limits, `HardwareErrorStatus` bitfield |
-| **`bareFOC::kinematics`** | Transmission & motion profiling | Reduction ratios, leadscrews, 1-DOF / 2-DOF kinematics, `TrapezoidalTrajectory` generator, `MultiTurnAccumulator` unwrapping, joint homing and calibration |
-| **`bareFOC::traits`** | Core device & persistence interfaces | `FOCMotor`, `FOCDriver`, `BLDCDriver`, `Sensor`, `CurrentSense`, `ConfigStorage`, `BootloaderHandoff` |
+| **`bareFOC` + `bareConfig`** | TOML-driven firmware runner & BSP codegen | `barefoc.toml` -> `memory.x`, `$OUT_DIR/bsp_generated.rs`, capability `--cfg` flags, generic runners (`bldc_foc_3pwm`, `bldc_foc_6pwm`, `dc_quad`) |
+| **`barefoc::math`** *(in `barefoc-core`)* | Coordinate transforms & modulation | Forward/Inverse Clarke, Forward/Inverse Park, Space Vector PWM (SVPWM), Sine PWM, Trapezoidal modulation |
+| **`barefoc::common`** *(in `barefoc-core`)* | Discrete-time signal conditioning | `PIDController` (anti-windup, ramp limit, derivative filter), `LowPassFilter`, monotonic `Clock` |
+| **`barefoc::motor`** *(in `barefoc-core`)* | Actuator state machines | `BLDCMotor`, `StepperMotor`, `HybridStepperMotor`, `DCMotor`, open/closed-loop velocity and angle control |
+| **`barefoc::control_table`** *(in `barefoc-core`)* | Universal actuator register map | Standardized 512-byte Control Table (EEPROM + RAM partitions), 4-axis motor bank, 8 operating modes, kinematics topology presets, soft limits, `HardwareErrorStatus` bitfield |
+| **`barefoc::kinematics`** *(in `barefoc-core`)* | Transmission & motion profiling | Reduction ratios, leadscrews, 1-DOF / 2-DOF kinematics, `TrapezoidalTrajectory` generator, `MultiTurnAccumulator` unwrapping, joint homing and calibration |
+| **`barefoc::traits`** *(in `barefoc-core`)* | Core device & persistence interfaces | `FOCMotor`, `FOCDriver`, `BLDCDriver`, `Sensor`, `CurrentSense`, `ConfigStorage`, `BootloaderHandoff` |
 | **`barefoc-drivers`** | Extended sensors and gate driver ICs | `AS5600`, `AS5048A/B`, `AS5047P`, `mt6xxx-rs` (MT6701 SSI), `drv83xx-rs` (DRV8316, DRV8311), `tmag-rs` (TMAG5273 3D Hall), `DCDriver2PWM` |
 | **`barefoc-comms`** | Telemetry and bus commanding | `barefoc-commander` (SmartServoCommander & ASCII parser), `barefoc-fibre` (ODrive GUI RPC), `barefoc-multibus` (384-byte Control Table profile), CAN frame mapping, `barefoc-rtt` (SWD stream) |
 | **`barefoc-hal`** | Silicon-level peripheral glue | Complementary 6-PWM with dead-time, timer quadrature encoders, CORDIC math, OPAMPs, `H5FlashStorage` ping-pong flash, `Stm32H5Bootloader` hand-off |

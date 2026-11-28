@@ -8,7 +8,7 @@ permalink: /examples/
 
 # Examples & Reference Designs
 
-BareFOC uses a **TOML-only board architecture**: each board in `bareFOC/examples/` contains only a declarative `barefoc.toml` manifest, and the shared `bareFOC/` firmware runner crate synthesizes `memory.x`, `$OUT_DIR/bsp_generated.rs`, and compile-time `--cfg` flags directly from `BAREFOC_BOARD`.
+BareFOC uses a **TOML-only board architecture**: each board in `bareFOC/examples/` contains only a declarative `barefoc.toml` manifest. At compile time, `bareFOC/build.rs` invokes `bareConfig` codegen to synthesize `memory.x`, `$OUT_DIR/bsp_generated.rs`, and capability `--cfg` flags directly from `BAREFOC_BOARD`, dispatching to generic capability-driven runners in `bareFOC/src/runners/` (`bldc_foc_3pwm`, `bldc_foc_6pwm`, `dc_quad`) with zero per-board `.rs` files.
 
 ---
 

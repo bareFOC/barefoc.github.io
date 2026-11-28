@@ -14,21 +14,21 @@ BareFOC uses Cargo feature flags to remain lightweight, enabling only the hardwa
 
 ## Adding Dependencies
 
-In your project's `Cargo.toml`, add `barefoc` alongside the peripheral crates you require:
+In your project's `Cargo.toml`, add `barefoc` (from the `bareFOC/barefoc-core` repository) alongside the peripheral crates you require:
 
 ```toml
 [dependencies]
-# Core FOC algorithms, transforms, and motor models
-barefoc = { version = "0.1", default-features = false }
+# Core FOC algorithms, transforms, and motor models (repo: bareFOC/barefoc-core)
+barefoc = { git = "https://github.com/bareFOC/barefoc-core", default-features = false }
 
 # Optional: Specialized sensors (AS5600, MT6701) and smart gate drivers (DRV8316, DRV8311)
-barefoc-drivers = { version = "0.1", default-features = false }
+barefoc-drivers = { git = "https://github.com/bareFOC/barefoc-drivers", default-features = false }
 
 # Optional: Telemetry & serial commanding (Commander, Fibre RPC, Multibus, RTT)
-barefoc-comms = { version = "0.1", default-features = false, features = ["commander", "rtt"] }
+barefoc-comms = { git = "https://github.com/bareFOC/barefoc-comms", default-features = false, features = ["commander", "rtt"] }
 
 # Optional: Hardware abstraction bridges for your target MCU
-barefoc-hal = { version = "0.1", default-features = false, features = ["stm32"] }
+barefoc-hal = { git = "https://github.com/bareFOC/barefoc-hal", default-features = false, features = ["stm32"] }
 
 # Essential embedded traits
 embedded-hal = "1.0"
