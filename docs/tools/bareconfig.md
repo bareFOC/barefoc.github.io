@@ -28,71 +28,51 @@ trunk serve --release
 
 ---
 
-## 2. Connecting to a Board or Project
+## 2. Beginner Mode vs. Advanced Mode
 
-When `bareConfig` opens, use the left sidebar in the **Home Hub** to either open a board definition or connect directly to hardware:
+`bareConfig` starts in **Beginner Mode** by default to provide a clean, guided zero-to-spin experience:
 
-1. **Connect to Hardware**:
-   - Select your transport (**Simulation**, **UART Serial**, **I2C / I3C Bus**, or **CAN Bus**).
-   - Enter the port or bus address and baud rate (for example, `250000` for UART or `1000000` for I3C), then click **Connect Hardware**.
-2. **Open or Create a Project**:
-   - Click **New BareFOC Project**, **New BareBOOT Target**, or **Open TOML / Directory** to load a `barefoc.toml` board file.
-   - Or pick a built-in template (**FishyServo**, **Miniata**, or **Generic Bootloader**) and click **Open Setup**.
-3. **Switch Workspace Mode**:
-   - Use the bottom-left toggle to switch between **BareFOC Mode** (firmware, calibration, tuning) and **BareBOOT Mode** (bootloader configuration and flashing).
-
----
-
-## 3. Setting Up & Flashing Firmware
-
-Open the **BareFOC Setup** (or **BareBOOT Setup**) tab to configure silicon pins, bus settings, and flash firmware:
-
-1. **Board & Pin Mapping**:
-   - Review the MCU pin assignments for PWM phases, gate sleep/fault, current sense ADC, sensor bus, and host communication.
-   - Confirm the safe-pin check reports `[ VALID - initial_safe_pins! OK ]` before flashing.
-2. **Host Communication**:
-   - Configure UART baud rate, I2C/I3C address and speed, or CAN bitrate and Node ID.
-   - See the [Configuration Reference](/config_reference/) for all `barefoc.toml` options.
-3. **TOML Editor**:
-   - Edit `barefoc.toml` directly with live schema validation, or click **Export Settings to TOML** after tuning to save live gains back to disk.
-4. **Flashing Bootloader & Firmware**:
-   - Use **BareBoot Flasher** to flash the bootloader to the boot slot.
-   - Use **BareFOC Flasher** to compile and flash application firmware.
-   - Enable **Preserve Persistent Settings (Sector 15 NVM)** when updating firmware on an already-calibrated board so your motor calibration, Node ID, and PID gains are kept intact.
+- **Beginner Mode**:
+  - **Home Hub** shows auto-detected USB adapters and SWD probes alongside board presets discovered dynamically from `bareFOC/examples/*/barefoc.toml` (`miniata`, `fishyservo`, `microspora`, and any custom boards in `./boards/`).
+  - **Guided 5-Step Setup** walks through:
+    1. **Select Board**: Pick your motor controller preset.
+    2. **Connect & Flash**: Choose an auto-detected adapter/probe (or Simulation) and flash firmware.
+    3. **Sensor Check**: Rotate the shaft by hand and verify smooth angle readout.
+    4. **Align & Test Spin**: Run automatic electrical zero alignment and a safe low-speed test spin.
+    5. **Save**: Commit calibration to Sector 15 flash NVM and export tuned settings back to `barefoc.toml`.
+  - Every board card also provides an **Edit TOML** shortcut to inspect or edit the board's `barefoc.toml` directly.
+- **Advanced Mode** (1-click toggle in the top header):
+  - Unlocks the full 5-page **Setup** sidebar (`Board & Pins`, `Host Comm Bus`, `BareBoot Flasher`, `BareFOC Flasher`, `TOML Editor`).
+  - Unlocks all 6 **Motor Workbench** workspaces: **Calibration**, **Oscilloscope**, **Loop Tuning** (cascaded PID diagram), **Vector Scope**, **Control Table** (512-byte canonical hex inspector with search), and **Bus Sniffer**.
 
 ---
 
-## 4. Calibrating & Tuning a Motor (`Motor Workbench`)
+## 3. Connecting to Hardware & Programmers
 
-Once connected to a running BareFOC node, the **Motor Workbench** tab appears in the top bar.
+`bareConfig` auto-detects connected host adapters and debug probes on startup (click **Refresh** in the Home Hub to re-scan):
 
-### Top Telemetry Bar
-Always visible across every workbench tool:
-- Live **Rotor Angle** (deg / rad), **Velocity** (RPM / rad/s), **Phase Currents** ($I_q, I_d$), **Bus Voltage** ($V_{bus}$), and **Temperature**.
-- **Arm / Disarm** toggle for closed-loop drive.
-- **Emergency Stop** button to immediately shut down PWM outputs and coast the motor safely.
+- **USB Serial (UART)**: `/dev/ttyACM*`, `/dev/ttyUSB*` (framed `StreamTransport` at 115200..2000000 baud, default `250000`).
+- **I2C Bus**: Linux `i2c-dev` (`/dev/i2c-*`) with 16-bit big-endian register pointers.
+- **I3C Bus**: Linux `/dev/i3c-*` devices.
+- **CAN Bus**: Linux SocketCAN (`can*`, `vcan*`).
+- **SWD Programmer (`probe-rs`)**: Raspberry Pi Debugprobe, ST-Link, WCH-Link, and CMSIS-DAP probes via `probe-rs`.
+- **Simulation (Offline Demo)**: Virtual actuator node implementing the canonical 512-byte control table.
 
-### Step-by-Step Commissioning Workflow
-1. **Motor Calibration**:
-   - Verify sensor readout and magnetic field health.
-   - Run **Electrical Zero Alignment** to measure pole pairs, sensor direction, and electrical zero offset.
-   - Use the **Jog** slider to confirm smooth bidirectional motion, then click **Save to NVM** to persist calibration to flash.
-2. **Closed-Loop Tuning**:
-   - Click any gain pill in the cascaded loop diagram (**Position P**, **Velocity PID**, **Current PI**, **LPF $T_f$**) to adjust gains live.
-3. **Oscilloscope & Step Benchmark**:
-   - Plot real-time position, velocity, and current waveforms at up to 60 FPS.
-   - Run an automated **Step-Response Benchmark** to measure rise time, settling time, and overshoot.
-4. **Vector & SVPWM Scope**:
-   - Inspect the live $(I_d, I_q)$ / $(\alpha, \beta)$ current vector and 6-sector SVPWM duty cycle hexagon.
-5. **Diagnostics**:
-   - **Control Table Inspector**: Search, read, and write individual registers in the live control table.
-   - **Bus Traffic Sniffer**: Capture, pause, and export MultiBus, BareBoot/Katapult, DXL2, and Commander frames.
+---
+
+## 4. On-Disk TOML Editor & Settings Export
+
+Open the **TOML Editor** from any board card (**Edit TOML**) or from the Advanced Setup sidebar:
+
+- **Open / Load**, **Save**, **Save As**, and **Quick-Load Board...** operate directly on `barefoc.toml` and `bareboot.toml` files on disk.
+- Validation routes `barefoc.toml` through `parse_barefoc_toml`, automatically inferring MCU flash/RAM layout and PWM timer assignments when `[memory]` or `[timers]` are omitted.
+- Clicking **Save to barefoc.toml** (or **Export Settings to TOML**) reads live PID gains and limits from the connected actuator and updates `[defaults]` in the target `barefoc.toml` file on disk.
 
 ---
 
 ## 5. Connecting an AI Assistant (MCP)
 
-`bareConfig` includes a built-in Model Context Protocol (MCP) server so AI coding assistants (such as Antigravity, Claude Desktop, or Cursor) can read telemetry, tune PIDs, run benchmarks, and flash firmware.
+`bareConfig` includes a built-in Model Context Protocol (MCP) server so AI coding assistants (such as Antigravity, Claude Desktop, or Cursor) can connect over `uart`, `i2c`, `i3c`, `can`, `probe-rs`, or `simulated` transports to read telemetry, tune PIDs, inspect canonical control-table registers, validate `barefoc.toml` via `parse_barefoc_toml`, and flash firmware.
 
 - **With the GUI running**: Click **Copy MCP Config** in the header (connects to `http://127.0.0.1:8765/sse`).
 - **Headless CLI mode**: Run `bareconfig --mcp` via stdio.
